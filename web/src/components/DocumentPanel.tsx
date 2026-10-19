@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { DocumentRecord } from '../types'
+import { ConfirmDialog } from './ConfirmDialog'
 import { EmptyState } from './ui'
 
 interface Props {
@@ -20,6 +21,7 @@ export function DocumentPanel({
   onRemove,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<DocumentRecord | null>(null)
 
   return (
     <div className="flex h-full flex-col">
@@ -88,11 +90,7 @@ export function DocumentPanel({
                 <button
                   type="button"
                   title="删除"
-                  onClick={() => {
-                    if (window.confirm(`删除「${document.name}」？审阅记录会一起归档。`)) {
-                      onRemove(document.id)
-                    }
-                  }}
+                  onClick={() => setPendingDelete(document)}
                   className="absolute right-1.5 top-1.5 hidden h-5 w-5 items-center justify-center rounded text-[11px] text-slate-400 hover:bg-red-50 hover:text-red-600 group-hover:flex"
                 >
                   ×
@@ -102,6 +100,18 @@ export function DocumentPanel({
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`删除「${pendingDelete?.name ?? ''}」？`}
+        message="合同和条款会从列表移除，审计记录保留在数据库中。此操作不可撤销。"
+        confirmText="删除合同"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) onRemove(pendingDelete.id)
+          setPendingDelete(null)
+        }}
+      />
     </div>
   )
 }
