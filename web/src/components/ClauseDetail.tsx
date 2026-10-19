@@ -19,6 +19,8 @@ const STATUS_LABEL: Record<Clause['status'], { text: string; tone: string }> = {
 
 export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment }: Props) {
   const [draft, setDraft] = useState('')
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   useEffect(() => {
     setDraft(clause?.comment ?? '')
@@ -106,12 +108,12 @@ export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment 
             <button
               type="button"
               onClick={() => {
-                const reason = window.prompt('驳回理由（会写入审计）')
-                if (reason && reason.trim()) onReject(reason.trim())
+                setRejectReason(clause.reject_reason || '')
+                setRejectOpen(true)
               }}
               className="rounded-md border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
             >
-              驳回
+              {clause.status === 'rejected' ? '修改驳回理由' : '驳回'}
             </button>
           ) : null}
           {clause.status === 'approved' ? (
@@ -131,6 +133,75 @@ export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment 
           </span>
         </div>
       </div>
+
+      {rejectOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setRejectOpen(false)
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {clause.status === 'rejected' ? '修改驳回理由' : '驳回这条条款'}
+                </h3>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  理由会写入审计记录，也会展示在报告里
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectOpen(false)}
+                aria-label="关闭"
+                className="-mr-1 -mt-1 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <textarea
+              autoFocus
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="例如：付款周期需要财务再确认"
+              className="mt-3 w-full resize-none rounded-md border border-slate-200 p-2.5 text-xs leading-6 outline-none focus:border-slate-400"
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px]">
+              <span className={rejectReason.trim() ? 'text-slate-400' : 'text-red-600'}>
+                {rejectReason.trim() ? '理由必填' : '请填写驳回理由'}
+              </span>
+              <span className="text-slate-400">{rejectReason.length}/500</span>
+            </div>
+
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectOpen(false)}
+                className="rounded-md border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={!rejectReason.trim()}
+                onClick={() => {
+                  onReject(rejectReason.trim())
+                  setRejectOpen(false)
+                }}
+                className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+              >
+                确认驳回
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

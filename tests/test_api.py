@@ -327,6 +327,24 @@ class ClauseWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 409)
 
+    def test_reject_reason_can_be_updated(self):
+        self.client.post(
+            f"/api/clauses/{self.clause['id']}/reject", json={"reason": "第一次理由"}
+        )
+        updated = self.client.post(
+            f"/api/clauses/{self.clause['id']}/reject", json={"reason": "改过的理由"}
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["clause"]["reject_reason"], "改过的理由")
+        self.assertFalse(updated.json()["replayed"])
+
+    def test_same_reject_reason_is_idempotent(self):
+        self.client.post(f"/api/clauses/{self.clause['id']}/reject", json={"reason": "同样的理由"})
+        again = self.client.post(
+            f"/api/clauses/{self.clause['id']}/reject", json={"reason": "同样的理由"}
+        )
+        self.assertTrue(again.json()["replayed"])
+
     def test_status_survives_review(self):
         self.client.post(f"/api/clauses/{self.clause['id']}/approve", json={"accepted": True})
         docs = self.client.get("/api/documents").json()

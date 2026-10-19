@@ -499,11 +499,32 @@ def reject_clause(
     if cached:
         return {**cached, "replayed": True}
     clause = owned_clause(clause_id, user["id"])
-    if (clause.get("status") or "pending") == "executed":
+    current = clause.get("status") or "pending"
+    reason = body.reason.strip()
+
+    if current == "executed":
         raise HTTPException(409, "已执行的条款不能再驳回")
-    result = _transition(
-        clause, user["id"], "rejected", reason=body.reason.strip(), action="reject_clause"
-    )
+
+    # 已驳回的条款允许补充或修改理由（这是真实需求：理由写错了要能改）
+    if current == "rejected":
+        if reason == (clause.get("reject_reason") or ""):
+            return {"status": "rejected", "clause": _clause_payload(clause_id), "replayed": True}
+        with db.tx() as conn:
+            conn.execute(
+                "UPDATE clauses SET reject_reason=?, updated_at=datetime('now') WHERE id=?",
+                (reason, clause_id),
+            )
+        audit(
+            clause["document_id"],
+            user["id"],
+            "reject_reason_updated",
+            {"clause_id": clause_id, "title": clause["title"], "from": clause.get("reject_reason") or "", "to": reason},
+        )
+        result = {"status": "rejected", "clause": _clause_payload(clause_id), "replayed": False}
+        _idem_store(user["id"], idempotency_key, "rejected", result)
+        return result
+
+    result = _transition(clause, user["id"], "rejected", reason=reason, action="reject_clause")
     _idem_store(user["id"], idempotency_key, "rejected", result)
     return result
 
