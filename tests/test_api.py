@@ -272,5 +272,68 @@ class ModelConfigTests(unittest.TestCase):
         self.assertEqual(other.delete(f"/api/settings/services/{service['id']}").status_code, 404)
 
 
+class ClauseWorkflowTests(unittest.TestCase):
+    """审批门禁与幂等执行。"""
+
+    def setUp(self):
+        self.client = make_client()
+        register(self.client, "wf")
+        doc = self.client.post(
+            "/api/documents/upload", json={"name": "状态机合同", "text": CONTRACT}
+        ).json()
+        result = self.client.post(f"/api/documents/{doc['id']}/review").json()
+        self.clause = result["document"]["clauses"][0]
+
+    def state(self, clause_id):
+        return self.client.get("/api/documents").json()[0]["clauses"]
+
+    def test_execute_requires_approval(self):
+        response = self.client.post(f"/api/clauses/{self.clause['id']}/execute")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("审批", response.json()["detail"])
+
+    def test_approve_then_execute(self):
+        approved = self.client.post(f"/api/clauses/{self.clause['id']}/approve", json={"accepted": True})
+        self.assertEqual(approved.json()["status"], "approved")
+
+        executed = self.client.post(f"/api/clauses/{self.clause['id']}/execute")
+        self.assertEqual(executed.json()["status"], "executed")
+        self.assertEqual(executed.json()["clause"]["status"], "executed")
+
+    def test_execute_is_idempotent(self):
+        self.client.post(f"/api/clauses/{self.clause['id']}/approve", json={"accepted": True})
+        first = self.client.post(f"/api/clauses/{self.clause['id']}/execute").json()
+        second = self.client.post(f"/api/clauses/{self.clause['id']}/execute").json()
+        self.assertFalse(first["replayed"])
+        self.assertTrue(second["replayed"])
+        self.assertEqual(first["clause"]["executed_at"], second["clause"]["executed_at"])
+
+    def test_reject_requires_reason(self):
+        response = self.client.post(f"/api/clauses/{self.clause['id']}/reject", json={"reason": ""})
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejected_cannot_execute(self):
+        self.client.post(
+            f"/api/clauses/{self.clause['id']}/reject", json={"reason": "条款描述不符"}
+        )
+        response = self.client.post(f"/api/clauses/{self.clause['id']}/execute")
+        self.assertEqual(response.status_code, 409)
+
+    def test_executed_cannot_be_rejected(self):
+        self.client.post(f"/api/clauses/{self.clause['id']}/approve", json={"accepted": True})
+        self.client.post(f"/api/clauses/{self.clause['id']}/execute")
+        response = self.client.post(
+            f"/api/clauses/{self.clause['id']}/reject", json={"reason": "反悔"}
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_status_survives_review(self):
+        self.client.post(f"/api/clauses/{self.clause['id']}/approve", json={"accepted": True})
+        docs = self.client.get("/api/documents").json()
+        result = self.client.post(f"/api/documents/{docs[0]['id']}/review").json()
+        kept = [c for c in result["document"]["clauses"] if c["title"] == self.clause["title"]][0]
+        self.assertEqual(kept["status"], "approved")
+
+
 if __name__ == "__main__":
     unittest.main()

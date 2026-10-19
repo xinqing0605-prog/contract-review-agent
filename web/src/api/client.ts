@@ -169,9 +169,25 @@ export const api = {
   },
 
   approve: (clauseId: string, accepted: boolean) =>
-    request<{ status: string; clause: Clause }>(
+    request<{ status: string; clause: Clause; replayed: boolean }>(
       `/api/clauses/${encodeURIComponent(clauseId)}/approve`,
       { method: 'POST', body: JSON.stringify({ accepted }) },
+    ),
+
+  reject: (clauseId: string, reason: string) =>
+    request<{ status: string; clause: Clause; replayed: boolean }>(
+      `/api/clauses/${encodeURIComponent(clauseId)}/reject`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
+
+  execute: (clauseId: string) =>
+    request<{ status: string; clause: Clause; replayed: boolean }>(
+      `/api/clauses/${encodeURIComponent(clauseId)}/execute`,
+      {
+        method: 'POST',
+        // 幂等键：同一波点击重复提交时后端只处理一次
+        headers: { 'Idempotency-Key': `${clauseId}-execute-${Date.now()}` },
+      },
     ),
 
   comment: (clauseId: string, comment: string) =>

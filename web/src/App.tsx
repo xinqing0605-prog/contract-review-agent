@@ -300,6 +300,8 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
                 <ClauseDetail
                   clause={workspace.activeClause}
                   onDecide={(accepted) => void workspace.decide(accepted)}
+                  onReject={(reason) => void workspace.reject(reason)}
+                  onExecute={() => void workspace.execute()}
                   onComment={(value) => void workspace.comment(value)}
                 />
               ) : (

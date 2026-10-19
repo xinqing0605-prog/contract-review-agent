@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -67,6 +67,10 @@ class ApproveRequest(BaseModel):
     accepted: bool = True
 
 
+class RejectRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class CommentRequest(BaseModel):
     comment: str = Field(default="", max_length=MAX_COMMENT_CHARS)
 
@@ -74,8 +78,12 @@ class CommentRequest(BaseModel):
 # --------------------------------------------------------------------------- 归属校验
 CLAUSE_FIELDS = (
     "id, document_id, title, risk, excerpt, original, reason, recommend, "
-    "start_offset, end_offset, accepted, COALESCE(comment,'') AS comment"
+    "start_offset, end_offset, accepted, COALESCE(comment,'') AS comment, "
+    "COALESCE(status,'pending') AS status, COALESCE(reject_reason,'') AS reject_reason, "
+    "approved_at, executed_at"
 )
+
+CLAUSE_STATUSES = {"pending", "approved", "rejected", "executed"}
 
 
 def owned_document(doc_id: str, user_id: str) -> dict[str, Any]:
@@ -215,27 +223,34 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
 
     with db.tx() as conn:
         previous = {
-            item["title"]: (item["accepted"], item["comment"] or "")
+            item["title"]: dict(item)
             for item in conn.execute(
-                "SELECT title, accepted, COALESCE(comment,'') AS comment FROM clauses WHERE document_id=?",
+                "SELECT title, accepted, COALESCE(comment,'') AS comment, "
+                "COALESCE(status,'pending') AS status, COALESCE(reject_reason,'') AS reject_reason, "
+                "approved_at, executed_at FROM clauses WHERE document_id=?",
                 (doc_id,),
             ).fetchall()
         }
         for clause in clauses:
-            accepted, comment = previous.get(clause["title"], (0, ""))
-            clause["accepted"] = accepted
-            clause["comment"] = comment
+            carried = previous.get(clause["title"])
+            clause["accepted"] = carried["accepted"] if carried else 0
+            clause["comment"] = carried["comment"] if carried else ""
+            clause["status"] = carried["status"] if carried else "pending"
+            clause["reject_reason"] = carried["reject_reason"] if carried else ""
+            clause["approved_at"] = carried["approved_at"] if carried else None
+            clause["executed_at"] = carried["executed_at"] if carried else None
 
         conn.execute("DELETE FROM clauses WHERE document_id=?", (doc_id,))
         conn.executemany(
             "INSERT INTO clauses(id,document_id,title,risk,excerpt,original,reason,recommend,"
-            "start_offset,end_offset,accepted,comment,updated_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
+            "start_offset,end_offset,accepted,comment,status,reject_reason,approved_at,executed_at,updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
             [
                 (
                     clause["id"], clause["document_id"], clause["title"], clause["risk"],
                     clause["excerpt"], clause["original"], clause["reason"], clause["recommend"],
                     clause["start_offset"], clause["end_offset"], clause["accepted"], clause["comment"],
+                    clause["status"], clause["reject_reason"], clause["approved_at"], clause["executed_at"],
                 )
                 for clause in clauses
             ],
@@ -371,23 +386,141 @@ def review_stream(doc_id: str, user: dict = Depends(current_user)) -> StreamingR
     )
 
 
-@app.post("/api/clauses/{clause_id}/approve")
-def approve_clause(
-    clause_id: str, body: ApproveRequest, user: dict = Depends(current_user)
-) -> dict[str, Any]:
-    clause = owned_clause(clause_id, user["id"])
+def _idem_lookup(user_id: str, key: str | None) -> dict[str, Any] | None:
+    """同一次请求重放时直接返回上次结果，避免重复写审计、重复改状态。"""
+    if not key:
+        return None
+    with db.tx() as conn:
+        row = conn.execute(
+            "SELECT response FROM idempotency_keys WHERE key=? AND user_id=?", (key, user_id)
+        ).fetchone()
+    return json.loads(row["response"]) if row else None
+
+
+def _idem_store(user_id: str, key: str | None, action: str, payload: dict[str, Any]) -> None:
+    if not key:
+        return
     with db.tx() as conn:
         conn.execute(
-            "UPDATE clauses SET accepted=?, updated_at=datetime('now') WHERE id=?",
-            (int(body.accepted), clause_id),
+            "INSERT OR REPLACE INTO idempotency_keys(key,user_id,action,response,created_at) "
+            "VALUES(?,?,?,?,datetime('now'))",
+            (key, user_id, action, json.dumps(payload, ensure_ascii=False)),
         )
-        updated = conn.execute(f"SELECT {CLAUSE_FIELDS} FROM clauses WHERE id=?", (clause_id,)).fetchone()
+
+
+def _clause_payload(clause_id: str) -> dict[str, Any]:
+    with db.tx() as conn:
+        row = conn.execute(f"SELECT {CLAUSE_FIELDS} FROM clauses WHERE id=?", (clause_id,)).fetchone()
+    return dict(row)
+
+
+def _transition(
+    clause: dict[str, Any],
+    user_id: str,
+    target: str,
+    reason: str = "",
+    action: str = "",
+) -> dict[str, Any]:
+    """状态机：pending → approved/rejected → executed。只允许合法流转。"""
+    current = clause.get("status") or "pending"
+
+    if target == current:
+        # 幂等返回：状态没变就不写审计
+        return {"status": current, "clause": _clause_payload(clause["id"]), "replayed": True}
+
+    if target == "approved" and current == "executed":
+        raise HTTPException(409, "这条已执行，不能再改回审批状态")
+    if target == "executed" and current != "approved":
+        raise HTTPException(409, "这条还没有通过审批，不能执行")
+
+    accepted = 1 if target in {"approved", "executed"} else 0
+    if target == "approved":
+        sql = (
+            "UPDATE clauses SET status=?, accepted=?, reject_reason='', "
+            "approved_at=datetime('now'), updated_at=datetime('now') WHERE id=?"
+        )
+        params = (target, accepted, clause["id"])
+    elif target == "executed":
+        sql = (
+            "UPDATE clauses SET status=?, accepted=?, "
+            "executed_at=datetime('now'), updated_at=datetime('now') WHERE id=?"
+        )
+        params = (target, accepted, clause["id"])
+    else:
+        sql = (
+            "UPDATE clauses SET status=?, accepted=?, reject_reason=?, "
+            "updated_at=datetime('now') WHERE id=?"
+        )
+        params = (target, accepted, reason, clause["id"])
+
+    with db.tx() as conn:
+        conn.execute(sql, params)
     audit(
-        clause["document_id"], user["id"],
-        "approve_clause" if body.accepted else "reject_clause",
-        {"clause_id": clause_id, "title": clause["title"]},
+        clause["document_id"],
+        user_id,
+        action or f"clause_{target}",
+        {"clause_id": clause["id"], "title": clause["title"], "from": current, "to": target},
     )
-    return {"status": "approved" if body.accepted else "rejected", "clause": dict(updated)}
+    return {"status": target, "clause": _clause_payload(clause["id"]), "replayed": False}
+
+
+@app.post("/api/clauses/{clause_id}/approve")
+def approve_clause(
+    clause_id: str,
+    body: ApproveRequest | None = None,
+    user: dict = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    cached = _idem_lookup(user["id"], idempotency_key)
+    if cached:
+        return {**cached, "replayed": True}
+    clause = owned_clause(clause_id, user["id"])
+    accepted = True if body is None else body.accepted
+    target = "approved" if accepted else "rejected"
+    result = _transition(
+        clause,
+        user["id"],
+        target,
+        reason="" if accepted else "未填写驳回理由",
+        action="approve_clause" if accepted else "reject_clause",
+    )
+    _idem_store(user["id"], idempotency_key, target, result)
+    return result
+
+
+@app.post("/api/clauses/{clause_id}/reject")
+def reject_clause(
+    clause_id: str,
+    body: RejectRequest,
+    user: dict = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    cached = _idem_lookup(user["id"], idempotency_key)
+    if cached:
+        return {**cached, "replayed": True}
+    clause = owned_clause(clause_id, user["id"])
+    if (clause.get("status") or "pending") == "executed":
+        raise HTTPException(409, "已执行的条款不能再驳回")
+    result = _transition(
+        clause, user["id"], "rejected", reason=body.reason.strip(), action="reject_clause"
+    )
+    _idem_store(user["id"], idempotency_key, "rejected", result)
+    return result
+
+
+@app.post("/api/clauses/{clause_id}/execute")
+def execute_clause(
+    clause_id: str,
+    user: dict = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    cached = _idem_lookup(user["id"], idempotency_key)
+    if cached:
+        return {**cached, "replayed": True}
+    clause = owned_clause(clause_id, user["id"])
+    result = _transition(clause, user["id"], "executed", action="execute_clause")
+    _idem_store(user["id"], idempotency_key, "executed", result)
+    return result
 
 
 @app.post("/api/clauses/{clause_id}/comment")

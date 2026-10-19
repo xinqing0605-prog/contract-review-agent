@@ -45,6 +45,8 @@ export interface Workspace {
   setFilter: (filter: RiskFilter) => void
   runReview: () => Promise<void>
   decide: (accepted: boolean) => Promise<void>
+  reject: (reason: string) => Promise<void>
+  execute: () => Promise<void>
   comment: (text: string) => Promise<void>
   upload: (name: string, text: string) => Promise<void>
   uploadFile: (file: File) => Promise<void>
@@ -231,6 +233,29 @@ export function useWorkspace(): Workspace {
     [activeClause, patchClause],
   )
 
+  const reject = useCallback(
+    async (reason: string) => {
+      if (!activeClause) return
+      try {
+        const result = await api.reject(activeClause.id, reason)
+        patchClause(result.clause)
+      } catch (cause) {
+        setError(errorMessage(cause))
+      }
+    },
+    [activeClause, patchClause],
+  )
+
+  const execute = useCallback(async () => {
+    if (!activeClause) return
+    try {
+      const result = await api.execute(activeClause.id)
+      patchClause(result.clause)
+    } catch (cause) {
+      setError(errorMessage(cause))
+    }
+  }, [activeClause, patchClause])
+
   const comment = useCallback(
     async (value: string) => {
       if (!activeClause) return
@@ -330,6 +355,8 @@ export function useWorkspace(): Workspace {
     setFilter,
     runReview,
     decide,
+    reject,
+    execute,
     comment,
     upload,
     uploadFile,

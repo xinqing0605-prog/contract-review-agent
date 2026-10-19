@@ -79,8 +79,22 @@ export function ClauseList({ clauses, visible, activeId, filter, onFilter, onSel
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-slate-800">{clause.title}</span>
                       <span className="flex shrink-0 items-center gap-1">
-                        {clause.accepted ? (
-                          <span className="text-[10px] font-medium text-emerald-600">已确认</span>
+                        {clause.status !== 'pending' ? (
+                          <span
+                            className={`text-[10px] font-medium ${
+                              clause.status === 'executed'
+                                ? 'text-emerald-600'
+                                : clause.status === 'approved'
+                                  ? 'text-sky-600'
+                                  : 'text-amber-600'
+                            }`}
+                          >
+                            {clause.status === 'executed'
+                              ? '已执行'
+                              : clause.status === 'approved'
+                                ? '已通过'
+                                : '已驳回'}
+                          </span>
                         ) : null}
                         <RiskBadge risk={clause.risk} compact />
                       </span>

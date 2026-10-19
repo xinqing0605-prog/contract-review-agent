@@ -5,10 +5,19 @@ import { EmptyState, RiskBadge } from './ui'
 interface Props {
   clause: Clause | null
   onDecide: (accepted: boolean) => void
+  onReject: (reason: string) => void
+  onExecute: () => void
   onComment: (comment: string) => void
 }
 
-export function ClauseDetail({ clause, onDecide, onComment }: Props) {
+const STATUS_LABEL: Record<Clause['status'], { text: string; tone: string }> = {
+  pending: { text: '待审批', tone: 'bg-slate-100 text-slate-600' },
+  approved: { text: '已通过', tone: 'bg-sky-100 text-sky-700' },
+  rejected: { text: '已驳回', tone: 'bg-amber-100 text-amber-700' },
+  executed: { text: '已执行', tone: 'bg-emerald-100 text-emerald-700' },
+}
+
+export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment }: Props) {
   const [draft, setDraft] = useState('')
 
   useEffect(() => {
@@ -30,7 +39,14 @@ export function ClauseDetail({ clause, onDecide, onComment }: Props) {
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-slate-900">{clause.title}</h3>
         </div>
-        <RiskBadge risk={clause.risk} />
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_LABEL[clause.status].tone}`}
+          >
+            {STATUS_LABEL[clause.status].text}
+          </span>
+          <RiskBadge risk={clause.risk} />
+        </span>
       </div>
 
       <div className="mt-2 space-y-3 px-4 pb-2">
@@ -75,37 +91,45 @@ export function ClauseDetail({ clause, onDecide, onComment }: Props) {
         </Block>
       </div>
 
-      <div className="mt-auto flex items-center gap-2 border-t border-slate-100 px-4 py-2.5">
-        {clause.accepted ? (
-          <>
-            <span className="text-xs font-medium text-emerald-600">已采纳</span>
-            <button
-              type="button"
-              onClick={() => onDecide(false)}
-              className="ml-auto rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              撤销
-            </button>
-          </>
-        ) : (
-          <>
+      <div className="mt-auto border-t border-slate-100 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {clause.status === 'pending' || clause.status === 'rejected' ? (
             <button
               type="button"
               onClick={() => onDecide(true)}
               className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
             >
-              采纳建议
+              通过审批
             </button>
+          ) : null}
+          {clause.status !== 'executed' ? (
             <button
               type="button"
-              onClick={() => onDecide(false)}
+              onClick={() => {
+                const reason = window.prompt('驳回理由（会写入审计）')
+                if (reason && reason.trim()) onReject(reason.trim())
+              }}
               className="rounded-md border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
             >
-              标记驳回
+              驳回
             </button>
-            <span className="ml-auto text-[10px] text-slate-400">写入审计记录</span>
-          </>
-        )}
+          ) : null}
+          {clause.status === 'approved' ? (
+            <button
+              type="button"
+              onClick={onExecute}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+            >
+              执行
+            </button>
+          ) : null}
+          {clause.status === 'executed' ? (
+            <span className="text-xs font-medium text-emerald-600">已执行，不可再修改</span>
+          ) : null}
+          <span className="ml-auto text-[10px] text-slate-400">
+            {clause.reject_reason ? `驳回理由：${clause.reject_reason}` : '状态变更写入审计'}
+          </span>
+        </div>
       </div>
     </div>
   )

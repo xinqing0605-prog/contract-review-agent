@@ -14,6 +14,11 @@ export interface Clause {
   end_offset: number
   accepted: number
   comment: string
+  /** 审批状态机：pending → approved/rejected → executed */
+  status: 'pending' | 'approved' | 'rejected' | 'executed'
+  reject_reason: string
+  approved_at: string | null
+  executed_at: string | null
 }
 
 export type DocumentStatus = 'pending' | 'reviewed'

@@ -16,6 +16,10 @@ function makeClause(overrides: Partial<Clause>): Clause {
     end_offset: 1,
     accepted: 0,
     comment: '',
+    status: 'pending',
+    reject_reason: '',
+    approved_at: null,
+    executed_at: null,
     ...overrides,
   }
 }

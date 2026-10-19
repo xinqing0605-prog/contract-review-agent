@@ -188,6 +188,32 @@ data: {"detail":"Key 无效或已失效"}
 
 返回 `{ "status": "approved", "clause": { ...更新后的条款... } }`。
 
+### POST /api/clauses/{id}/approve
+
+```json
+{ "accepted": true }
+```
+
+通过审批 → 状态变为 `approved`；传 `accepted: false` 等同于快速驳回。
+
+### POST /api/clauses/{id}/reject
+
+```json
+{ "reason": "付款周期仍需与财务确认" }
+```
+
+驳回理由必填（1–500 字），写入审计。
+
+### POST /api/clauses/{id}/execute
+
+只有 `approved` 状态可以执行，否则返回 `409`：
+
+```json
+{ "status": "executed", "clause": { "...": "..." }, "replayed": false }
+```
+
+重复调用返回同一结果（`replayed: true`），可配合请求头 `Idempotency-Key` 做接口级重放。
+
 ### POST /api/clauses/{id}/comment
 
 ```json

@@ -115,7 +115,18 @@ CREATE TABLE IF NOT EXISTS clauses(
   end_offset INTEGER,
   accepted INTEGER DEFAULT 0,
   comment TEXT DEFAULT '',
+  status TEXT DEFAULT 'pending',
+  reject_reason TEXT DEFAULT '',
+  approved_at TEXT,
+  executed_at TEXT,
   updated_at TEXT);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys(
+  key TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE IF NOT EXISTS review_audit(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -218,6 +229,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for name, ddl in (
         ("comment", "TEXT DEFAULT ''"),
         ("updated_at", "TEXT"),
+        ("status", "TEXT DEFAULT 'pending'"),
+        ("reject_reason", "TEXT DEFAULT ''"),
+        ("approved_at", "TEXT"),
+        ("executed_at", "TEXT"),
     ):
         if name not in clause_columns:
             conn.execute(f"ALTER TABLE clauses ADD COLUMN {name} {ddl}")
