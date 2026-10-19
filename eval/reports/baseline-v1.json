@@ -1,0 +1,139 @@
+{
+  "iou_threshold": 0.5,
+  "aggregate": {
+    "precision": 0.8,
+    "recall": 0.8571428571428571,
+    "f1": 0.8275862068965518
+  },
+  "cases": [
+    {
+      "id": "case-01",
+      "name": "供应商服务合同",
+      "gold": 4,
+      "pred": 5,
+      "tp": 3,
+      "fp": 2,
+      "fn": 1,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [
+        "责任限制"
+      ],
+      "spurious": [
+        "责任限制",
+        "数据使用"
+      ]
+    },
+    {
+      "id": "case-02",
+      "name": "渠道合作协议",
+      "gold": 2,
+      "pred": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [],
+      "spurious": []
+    },
+    {
+      "id": "case-03",
+      "name": "软件采购订单",
+      "gold": 2,
+      "pred": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [],
+      "spurious": []
+    },
+    {
+      "id": "case-04",
+      "name": "不可抗力（硬负样本）",
+      "gold": 0,
+      "pred": 1,
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "risk_accuracy": 0.0,
+      "containment": 0.0,
+      "grounding": 1.0,
+      "mean_iou": 0.0,
+      "missed": [],
+      "spurious": [
+        "责任限制"
+      ]
+    },
+    {
+      "id": "case-05",
+      "name": "良性付款与责任上限",
+      "gold": 2,
+      "pred": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [],
+      "spurious": []
+    },
+    {
+      "id": "case-06",
+      "name": "数据与保密",
+      "gold": 2,
+      "pred": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [],
+      "spurious": []
+    },
+    {
+      "id": "case-07",
+      "name": "SLA 与抵扣",
+      "gold": 1,
+      "pred": 1,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "risk_accuracy": 1.0,
+      "containment": 1.0,
+      "grounding": 1.0,
+      "mean_iou": 1.0,
+      "missed": [],
+      "spurious": []
+    },
+    {
+      "id": "case-08",
+      "name": "单方解除（同义改写，无关键词）",
+      "gold": 1,
+      "pred": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1,
+      "risk_accuracy": 0.0,
+      "containment": 0.0,
+      "grounding": 1.0,
+      "mean_iou": 0.0,
+      "missed": [
+        "责任限制"
+      ],
+      "spurious": []
+    }
+  ]
+}

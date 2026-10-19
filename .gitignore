@@ -1,0 +1,28 @@
+# 运行时数据：不要提交
+data/
+.logs/
+.private/
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+web/dist/
+*.local
+
+# 本地配置
+.env
+.env.local
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
