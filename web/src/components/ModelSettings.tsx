@@ -7,6 +7,7 @@ import {
   type ServiceModel,
   type ServiceView,
 } from '../api/client'
+import { ConfirmDialog } from './ConfirmDialog'
 import { CloseButton, EyeButton, Spinner } from './ui'
 
 interface Props {
@@ -32,6 +33,12 @@ type Dialog =
 const EMPTY_SERVICE = { name: '', kind: '大模型' }
 
 export function ModelSettings({ open, onClose }: Props) {
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string
+    message: string
+    confirmText?: string
+    action: () => void
+  } | null>(null)
   const [services, setServices] = useState<ServiceView[]>([])
   const [presets, setPresets] = useState<PresetView[]>([])
   const [kinds, setKinds] = useState<string[]>(['大模型', '综合服务', '本地模型', '自定义'])
@@ -314,14 +321,18 @@ export function ModelSettings({ open, onClose }: Props) {
                       <button
                         type="button"
                         onClick={() => {
-                          if (
-                            !window.confirm(
-                              `「${selected.name}」下绑定了 ${selected.models.length} 个模型。是否连同这些模型及其连接配置一起删除？`,
-                            )
-                          ) {
-                            return
-                          }
-                          void run(`del-${selected.id}`, () => api.services.remove(selected.id))
+                          const service = selected
+                          setPendingConfirm({
+                            title: `删除服务商「${service.name}」？`,
+                            message:
+                              service.models.length > 0
+                                ? `这个服务商下还有 ${service.models.length} 个模型，会连同连接配置一起删除。此操作不可撤销。`
+                                : '删除后需要重新填写接口地址和 API Key，此操作不可撤销。',
+                            confirmText: '删除服务商',
+                            action: () => {
+                              void run(`del-${service.id}`, () => api.services.remove(service.id))
+                            },
+                          })
                         }}
                         className="rounded-md border border-red-200 px-2.5 py-1 text-[11px] text-red-600 hover:bg-red-50"
                       >
@@ -404,11 +415,19 @@ export function ModelSettings({ open, onClose }: Props) {
                           <button
                             type="button"
                             onClick={() => {
-                              if (!window.confirm(`删除模型「${model.name}」及它的连接配置？`)) return
-                              void run(`del-${model.id}`, () =>
-                                api.services.removeModel(selected.id, model.id),
-                              )
-                            }}
+                          const service = selected
+                          setPendingConfirm({
+                            title: `删除服务商「${service.name}」？`,
+                            message:
+                              service.models.length > 0
+                                ? `这个服务商下还有 ${service.models.length} 个模型，会连同连接配置一起删除。此操作不可撤销。`
+                                : '删除后需要重新填写接口地址和 API Key，此操作不可撤销。',
+                            confirmText: '删除服务商',
+                            action: () => {
+                              void run(`del-${service.id}`, () => api.services.remove(service.id))
+                            },
+                          })
+                        }}
                             className="rounded border border-slate-200 px-2 py-0.5 text-[10px] text-red-600 hover:bg-red-50"
                           >
                             删除模型
@@ -568,6 +587,19 @@ export function ModelSettings({ open, onClose }: Props) {
           </div>
         </DialogShell>
       ) : null}
+    
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ''}
+        message={pendingConfirm?.message ?? ''}
+        confirmText={pendingConfirm?.confirmText}
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={() => {
+          const pending = pendingConfirm
+          setPendingConfirm(null)
+          pending?.action()
+        }}
+      />
     </div>
   )
 }
