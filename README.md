@@ -4,6 +4,20 @@
 
 技术栈：FastAPI · SQLite · React 19 · TypeScript · Vite · Tailwind CSS
 
+## 界面预览
+
+**主工作台**　左侧文档 · 中间原文高亮 · 右侧条款证据
+
+![主工作台](docs/images/workbench.png)
+
+**审批状态机**　待审批 → 已通过 / 已驳回 → 已执行，服务端强制门禁
+
+![审批状态机](docs/images/approval.png)
+
+**模型配置**　服务商只是分组，每个模型独立保存接口地址与 Key
+
+![模型设置](docs/images/models.png)
+
 ## 功能
 
 **账号与数据隔离**
