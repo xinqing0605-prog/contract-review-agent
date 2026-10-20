@@ -32,6 +32,15 @@ type Dialog =
 
 const EMPTY_SERVICE = { name: '', kind: '大模型' }
 
+/** 后端存的是 UTC 时间（SQLite datetime('now')），这里转成本地时区显示 */
+function formatLocal(value: string): string {
+  const iso = value.includes('T') ? value : value.replace(' ', 'T') + 'Z'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export function ModelSettings({ open, onClose }: Props) {
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string
@@ -365,7 +374,7 @@ export function ModelSettings({ open, onClose }: Props) {
                             </p>
                           </div>
                           <span className="shrink-0 text-[10px] text-slate-400">
-                            {model.verified_at ? `已验证 ${model.verified_at}` : '未验证'}
+                            {model.verified_at ? `已验证 ${formatLocal(model.verified_at)}` : '未验证'}
                           </span>
                         </div>
 

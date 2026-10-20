@@ -86,6 +86,10 @@ CLAUSE_FIELDS = (
 CLAUSE_STATUSES = {"pending", "approved", "rejected", "executed"}
 
 
+class _NoModelNeeded(Exception):
+    """所有条款都是低风险，用规则解释即可，不调用模型以节省时间与费用。"""
+
+
 def owned_document(doc_id: str, user_id: str) -> dict[str, Any]:
     with db.tx() as conn:
         row = conn.execute(
@@ -173,20 +177,26 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
         try:
             from .provider import complete_json
 
+            # 低风险条款用规则解释即可，只把高/中风险交给模型，显著减少输入与输出 token
+            model_clauses = [clause for clause in clauses if clause["risk"] != "low"]
+            if not model_clauses:
+                raise _NoModelNeeded()
+
             ai, model_meta = complete_json(
                 config,
                 "你是合同条款审阅助手。根据原文和候选条款输出 JSON 对象，格式为"
                 '{"clauses":[{"id":"原候选id","risk":"high","reason":"风险解释","recommend":"修改建议"}]}。'
                 "只能使用提供的候选 id；风险级别只能是 high、medium、low。"
+                "reason 与 recommend 各用不超过 40 字的中文短句，不要复述原文。"
                 "保持审慎，不能编造原文和法律结论。",
                 {
                     "document_name": document["name"],
                     "candidates": [
                         {"id": clause["id"], "title": clause["title"], "excerpt": clause["original"]}
-                        for clause in clauses
+                        for clause in model_clauses
                     ],
                 },
-                max_tokens=2200,
+                max_tokens=1200,
             )
             mapped = {
                 item.get("id"): item
@@ -208,6 +218,8 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
                 f"{usage.get('total_tokens', 0)} tokens · {(model_meta or {}).get('duration_ms', 0)} ms",
                 tick,
             )
+        except _NoModelNeeded:
+            yield _step("模型审阅", "success", "仅低风险条款，使用规则解释", tick)
         except HTTPException as exc:
             model_error = str(exc.detail)
             yield _step("模型审阅", "skipped", f"{model_error}，已降级为规则解释", tick)
