@@ -4,6 +4,10 @@
 
 技术栈：FastAPI · SQLite · React 19 · TypeScript · Vite · Tailwind CSS
 
+**在线演示**　https://contract-review-agent-xi3i.onrender.com
+
+> 免费实例，首次访问可能需要 30–60 秒唤醒。演示账号 `demo@clauseguard.local` / `demo1234`（未配置模型，以规则模式运行；配置自己的模型后可看到 AI 生成的风险解释）。
+
 ## 界面预览
 
 **主工作台**　左侧文档 · 中间原文高亮 · 右侧条款证据
