@@ -2,7 +2,7 @@
 FROM node:20-slim AS web
 WORKDIR /app/web
 COPY web/package.json ./
-RUN npm install
+RUN npm install --registry=https://registry.npmmirror.com
 COPY web/ ./
 RUN npm run build
 
@@ -15,7 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CLAUSEGUARD_DATA=/data
 
 COPY backend/requirements.txt backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r backend/requirements.txt
 
 COPY backend/ backend/
 COPY --from=web /app/web/dist web/dist
