@@ -56,5 +56,16 @@ jobs:
           echo "=== 4/4 清理并确认 ==="
           docker image prune -f
           docker ps --filter name=contract-agent --format "{{.Status}}  {{.Ports}}"
-          curl -fsS -o /dev/null -w "本机健康检查: HTTP %{http_code}\n" http://127.0.0.1:8081/
+
+          echo "等待应用就绪（最多 60 秒）..."
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8081/; then
+              echo "健康检查通过（第 $i 次尝试）"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "健康检查失败：60 秒内未就绪，最后 40 行日志："
+          docker logs contract-agent --tail 40
+          exit 1
           EOF
