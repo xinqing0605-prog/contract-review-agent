@@ -1,0 +1,60 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload source
+        run: |
+          rsync -az --delete \
+            --exclude '.git' --exclude 'node_modules' --exclude '.venv' \
+            --exclude 'data' --exclude '.logs' --exclude '__pycache__' \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/apps/contract-review-agent/
+
+      - name: Build, test, restart
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -s' <<'EOF'
+          set -e
+          cd /opt/apps/contract-review-agent
+
+          echo "=== 1/4 构建镜像 ==="
+          docker build -t contract-agent:1.0 .
+
+          echo "=== 2/4 运行测试（失败则中止，旧版本继续服务）==="
+          docker run --rm \
+            -v /opt/apps/contract-review-agent/tests:/app/tests \
+            contract-agent:1.0 \
+            python -m unittest discover -s tests -p "test_*.py" -v
+
+          echo "=== 3/4 重启容器 ==="
+          docker rm -f contract-agent 2>/dev/null || true
+          docker run -d --name contract-agent --restart=always \
+            -p 8081:8103 \
+            -v /opt/cg-data:/data \
+            -e CLAUSEGUARD_DATA=/data \
+            -e CLAUSEGUARD_DB=/data/clauseguard.sqlite3 \
+            -e CLAUSEGUARD_SECRET='${{ secrets.CLAUSEGUARD_SECRET }}' \
+            -e CLAUSEGUARD_SECURE_COOKIES=0 \
+            -e CLAUSEGUARD_ALLOW_PRIVATE_MODEL=0 \
+            contract-agent:1.0
+
+          echo "=== 4/4 清理并确认 ==="
+          docker image prune -f
+          docker ps --filter name=contract-agent --format "{{.Status}}  {{.Ports}}"
+          curl -fsS -o /dev/null -w "本机健康检查: HTTP %{http_code}\n" http://127.0.0.1:8081/
+          EOF
