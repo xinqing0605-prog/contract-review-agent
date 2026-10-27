@@ -9,6 +9,7 @@ import { MetricsBar } from './components/MetricsBar'
 import { ModelSettings } from './components/ModelSettings'
 import { PasteDialog } from './components/PasteDialog'
 import { SourceText } from './components/SourceText'
+import { UsagePanel } from './components/UsagePanel'
 import { WorkflowTimeline } from './components/WorkflowTimeline'
 import { EmptyState, Panel, Spinner } from './components/ui'
 import { useSession } from './hooks/useSession'
@@ -51,6 +52,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
   const [uploading, setUploading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [usageOpen, setUsageOpen] = useState(false)
 
   const [activeModel, setActiveModel] = useState<string | null>(null)
 
@@ -130,6 +132,13 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
               className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
             >
               审计
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsageOpen(true)}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              用量
             </button>
 
             <div className="relative">
@@ -339,6 +348,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
         documentName={workspace.activeDocument?.name ?? ''}
         onClose={workspace.closeAudit}
       />
+      <UsagePanel open={usageOpen} onClose={() => setUsageOpen(false)} />
     </div>
   )
 }

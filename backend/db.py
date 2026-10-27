@@ -135,6 +135,23 @@ CREATE TABLE IF NOT EXISTS review_audit(
   action TEXT,
   payload TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE IF NOT EXISTS llm_calls(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  document_id TEXT,
+  purpose TEXT NOT NULL DEFAULT 'review',
+  model TEXT DEFAULT '',
+  base_url TEXT DEFAULT '',
+  prompt_tokens INTEGER DEFAULT 0,
+  completion_tokens INTEGER DEFAULT 0,
+  total_tokens INTEGER DEFAULT 0,
+  duration_ms REAL DEFAULT 0,
+  ok INTEGER DEFAULT 1,
+  error TEXT DEFAULT '',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+
+CREATE INDEX IF NOT EXISTS idx_llm_calls_user_time ON llm_calls(user_id, created_at);
 """
 
 

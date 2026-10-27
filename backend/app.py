@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, db, model_config
+from . import auth, db, llm_stats, model_config
 from .auth import current_user
 from .detector import analyze_text  # noqa: F401  re-export 给测试
 from .ingest import extract_text
@@ -211,6 +211,16 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
                         clause[field] = value
             mode = "deepseek"
             usage = (model_meta or {}).get("usage") or {}
+            llm_stats.record(
+                user_id=user["id"],
+                document_id=doc_id,
+                purpose="review",
+                model=str((model_meta or {}).get("model", config["model"])),
+                base_url=str(config["base_url"]),
+                usage=usage,
+                duration_ms=float((model_meta or {}).get("duration_ms", 0) or 0),
+                ok=True,
+            )
             yield _step(
                 "模型审阅",
                 "success",
@@ -222,6 +232,16 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
             yield _step("模型审阅", "success", "仅低风险条款，使用规则解释", tick)
         except HTTPException as exc:
             model_error = str(exc.detail)
+            llm_stats.record(
+                user_id=user["id"],
+                document_id=doc_id,
+                purpose="review",
+                model=str(config.get("model") or ""),
+                base_url=str(config.get("base_url") or ""),
+                duration_ms=round((time.perf_counter() - tick) * 1000, 2),
+                ok=False,
+                error=model_error,
+            )
             yield _step("模型审阅", "skipped", f"{model_error}，已降级为规则解释", tick)
     else:
         yield _step("模型审阅", "skipped", "未配置模型，使用规则解释", time.perf_counter())
@@ -590,6 +610,12 @@ def document_audit(doc_id: str, user: dict = Depends(current_user)) -> list[dict
             {"id": row["id"], "action": row["action"], "payload": payload, "created_at": row["created_at"]}
         )
     return events
+
+
+@app.get("/api/metrics/llm")
+def llm_metrics(days: int = 7, user: dict = Depends(current_user)) -> dict[str, Any]:
+    """当前用户最近 N 天的模型调用用量（次数 / token / 耗时 / 失败）。"""
+    return llm_stats.summary(user["id"], days=days)
 
 
 DISPOSITION = {"high": "高风险", "medium": "中风险", "low": "低风险"}

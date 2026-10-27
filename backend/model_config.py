@@ -14,6 +14,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import time
 import uuid
 from typing import Any
 from urllib.parse import urlparse
@@ -21,7 +22,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from . import db, provider
+from . import db, llm_stats, provider
 from .auth import current_user
 from .security import decrypt_secret, encrypt_secret, key_hint
 
@@ -374,6 +375,7 @@ def test_model(
     api_key = _decrypt(row["api_key_enc"])
     if not api_key:
         raise HTTPException(409, "这个模型还没有填写 API Key")
+    started = time.perf_counter()
     try:
         result, meta = provider.complete_json(
             {"base_url": row["base_url"], "model": row["name"], "api_key": api_key},
@@ -382,9 +384,36 @@ def test_model(
             max_tokens=64,
         )
     except HTTPException as exc:
+        llm_stats.record(
+            user_id=user["id"],
+            purpose="connection_check",
+            model=str(row["name"] or ""),
+            base_url=str(row["base_url"] or ""),
+            duration_ms=round((time.perf_counter() - started) * 1000, 2),
+            ok=False,
+            error=str(exc.detail),
+        )
         raise HTTPException(502, str(exc.detail)) from None
     if result.get("ok") is not True:
+        llm_stats.record(
+            user_id=user["id"],
+            purpose="connection_check",
+            model=str(row["name"] or ""),
+            base_url=str(row["base_url"] or ""),
+            duration_ms=round((time.perf_counter() - started) * 1000, 2),
+            ok=False,
+            error="模型返回内容不符合 JSON 格式要求",
+        )
         raise HTTPException(502, "模型返回了内容，但不符合 JSON 格式要求")
+    llm_stats.record(
+        user_id=user["id"],
+        purpose="connection_check",
+        model=str(meta.get("model") or row["name"] or ""),
+        base_url=str(row["base_url"] or ""),
+        usage=meta.get("usage") or {},
+        duration_ms=float(meta.get("duration_ms") or 0),
+        ok=True,
+    )
     with db.tx() as conn:
         conn.execute(
             "UPDATE service_models SET verified_at=datetime('now') WHERE id=?", (model_id,)

@@ -46,6 +46,54 @@ export interface PresetInput {
   base_url: string
 }
 
+export interface LlmUsageTotals {
+  calls: number
+  ok: number
+  failed: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  avg_duration_ms: number
+  p95_duration_ms: number
+}
+
+export interface LlmUsageDay {
+  date: string
+  calls: number
+  failed: number
+  total_tokens: number
+}
+
+export interface LlmUsageModel {
+  model: string
+  calls: number
+  failed: number
+  total_tokens: number
+  avg_duration_ms: number
+}
+
+export interface LlmUsageRecord {
+  id: number
+  document_id: string | null
+  purpose: string
+  purpose_label: string
+  model: string
+  total_tokens: number
+  duration_ms: number
+  ok: boolean
+  error: string
+  created_at: string
+}
+
+export interface LlmUsage {
+  days: number
+  since: string
+  totals: LlmUsageTotals
+  by_day: LlmUsageDay[]
+  by_model: LlmUsageModel[]
+  recent: LlmUsageRecord[]
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -248,8 +296,7 @@ export const api = {
       request<{ presets: PresetView[] }>('/api/settings/presets', {
         method: 'POST',
         body: JSON.stringify(input),
-      }),
-    update: (id: string, input: PresetInput) =>
+      }),    update: (id: string, input: PresetInput) =>
       request<{ presets: PresetView[] }>(
         `/api/settings/presets/${encodeURIComponent(id)}`,
         { method: 'PUT', body: JSON.stringify(input) },
@@ -259,6 +306,10 @@ export const api = {
         `/api/settings/presets/${encodeURIComponent(id)}`,
         { method: 'DELETE' },
       ),
+  },
+
+  metrics: {
+    llm: (days = 7) => request<LlmUsage>(`/api/metrics/llm?days=${days}`),
   },
 
   /**

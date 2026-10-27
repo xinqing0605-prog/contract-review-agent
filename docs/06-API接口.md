@@ -236,6 +236,37 @@ data: {"detail":"Key 无效或已失效"}
 ]
 ```
 
+## 观测
+
+### GET /api/metrics/llm?days=7
+
+当前登录用户最近 N 天（1–90）的模型调用用量。数据来自 `llm_calls` 表，仅包含本账号。
+
+```json
+{
+  "days": 7,
+  "since": "2026-10-20 08:00:00",
+  "totals": {
+    "calls": 12, "ok": 11, "failed": 1,
+    "prompt_tokens": 8200, "completion_tokens": 1900, "total_tokens": 10100,
+    "avg_duration_ms": 2140.5, "p95_duration_ms": 4020.0
+  },
+  "by_day": [{ "date": "2026-10-26", "calls": 5, "failed": 0, "total_tokens": 4200 }],
+  "by_model": [{ "model": "deepseek-chat", "calls": 10, "failed": 1,
+                 "total_tokens": 9600, "avg_duration_ms": 2050.0 }],
+  "recent": [{ "id": 31, "purpose": "review", "purpose_label": "合同审阅",
+               "model": "deepseek-chat", "total_tokens": 860, "duration_ms": 1980.2,
+               "ok": true, "error": "", "created_at": "2026-10-26 09:12:03" }]
+}
+```
+
+说明：
+
+- 只统计成功调用的耗时（`avg_duration_ms` / `p95_duration_ms`），失败单独计数
+- `p95` 采用最近秩法（nearest-rank），样本数少时等于最大值
+- `usage` 缺失的服务商按 0 计 token，不影响调用计数
+- 需要登录，未登录返回 401
+
 ## 报告
 
 ### GET /api/report/{id}
