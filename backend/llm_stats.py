@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 PURPOSE_LABEL = {
     "review": "合同审阅",
     "connection_check": "连接检测",
+    "embedding": "语义召回",
 }
 
 

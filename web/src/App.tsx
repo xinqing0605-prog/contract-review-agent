@@ -8,6 +8,7 @@ import { DocumentPanel } from './components/DocumentPanel'
 import { MetricsBar } from './components/MetricsBar'
 import { ModelSettings } from './components/ModelSettings'
 import { PasteDialog } from './components/PasteDialog'
+import { RecallPanel } from './components/RecallPanel'
 import { SourceText } from './components/SourceText'
 import { UsagePanel } from './components/UsagePanel'
 import { WorkflowTimeline } from './components/WorkflowTimeline'
@@ -53,6 +54,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [usageOpen, setUsageOpen] = useState(false)
+  const [recallOpen, setRecallOpen] = useState(false)
 
   const [activeModel, setActiveModel] = useState<string | null>(null)
 
@@ -139,6 +141,13 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
               className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
             >
               用量
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecallOpen(true)}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              语义召回
             </button>
 
             <div className="relative">
@@ -349,6 +358,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
         onClose={workspace.closeAudit}
       />
       <UsagePanel open={usageOpen} onClose={() => setUsageOpen(false)} />
+      <RecallPanel open={recallOpen} onClose={() => setRecallOpen(false)} />
     </div>
   )
 }

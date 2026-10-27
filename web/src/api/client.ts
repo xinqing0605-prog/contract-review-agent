@@ -46,6 +46,26 @@ export interface PresetInput {
   base_url: string
 }
 
+export interface RecallModelOption {
+  id: string
+  name: string
+  base_url: string
+  service: string
+  configured: boolean
+}
+
+export interface RecallSettings {
+  settings: { enabled: boolean; model_id: string; threshold: number }
+  models: RecallModelOption[]
+  bounds: { min: number; max: number; default: number }
+}
+
+export interface RecallSettingsInput {
+  enabled: boolean
+  model_id: string
+  threshold: number
+}
+
 export interface LlmUsageTotals {
   calls: number
   ok: number
@@ -310,6 +330,15 @@ export const api = {
 
   metrics: {
     llm: (days = 7) => request<LlmUsage>(`/api/metrics/llm?days=${days}`),
+  },
+
+  recall: {
+    get: () => request<RecallSettings>('/api/settings/recall'),
+    save: (input: RecallSettingsInput) =>
+      request<RecallSettings>('/api/settings/recall', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
   },
 
   /**

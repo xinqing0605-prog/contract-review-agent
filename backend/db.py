@@ -152,6 +152,19 @@ CREATE TABLE IF NOT EXISTS llm_calls(
   created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 
 CREATE INDEX IF NOT EXISTS idx_llm_calls_user_time ON llm_calls(user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS embedding_settings(
+  user_id TEXT PRIMARY KEY,
+  model_id TEXT DEFAULT '',
+  threshold REAL DEFAULT 0.82,
+  enabled INTEGER DEFAULT 0,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE IF NOT EXISTS embedding_cache(
+  key TEXT PRIMARY KEY,
+  model TEXT NOT NULL,
+  vector TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 """
 
 

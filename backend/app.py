@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, db, llm_stats, model_config
+from . import auth, db, llm_stats, model_config, recall_settings, semantic
 from .auth import current_user
 from .detector import analyze_text  # noqa: F401  re-export 给测试
 from .ingest import extract_text
@@ -42,6 +42,7 @@ db.init()
 app = FastAPI(title="ClauseGuard", version="2.0.0")
 app.include_router(auth.router)
 app.include_router(model_config.router)
+app.include_router(recall_settings.router)
 
 
 # --------------------------------------------------------------------------- 安全响应头
@@ -167,6 +168,55 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
     tick = time.perf_counter()
     clauses = analyze_text(doc_id, text)
     yield _step("条款切分", "success", f"识别 {len(clauses)} 条候选条款", tick)
+
+    # 语义召回：补规则漏掉的同义表述；默认关闭，用户在「语义召回」里显式开启
+    recall_config = recall_settings.resolve_config(user["id"])
+    if recall_config and text.strip():
+        recall_tick = time.perf_counter()
+        threshold = float(recall_settings.load(user["id"])["threshold"])
+        try:
+            extra, recall_usage, recall_stats = semantic.recall(
+                doc_id,
+                text,
+                [(clause["start_offset"], clause["end_offset"]) for clause in clauses],
+                config=recall_config,
+                threshold=threshold,
+            )
+            llm_stats.record(
+                user_id=user["id"],
+                document_id=doc_id,
+                purpose="embedding",
+                model=str(recall_config.get("model") or ""),
+                base_url=str(recall_config.get("base_url") or ""),
+                usage=recall_usage,
+                duration_ms=round((time.perf_counter() - recall_tick) * 1000, 2),
+                ok=True,
+            )
+            if extra:
+                clauses.extend(extra)
+                clauses.sort(key=lambda clause: clause["start_offset"])
+                for index, clause in enumerate(clauses, 1):
+                    clause["id"] = f"{doc_id}-{index}"
+            yield _step(
+                "语义召回",
+                "success",
+                f"补充 {len(extra)} 条 · 扫描 {recall_stats['sentences']} 句 · 阈值 {recall_stats['threshold']}",
+                recall_tick,
+            )
+        except HTTPException as exc:
+            llm_stats.record(
+                user_id=user["id"],
+                document_id=doc_id,
+                purpose="embedding",
+                model=str(recall_config.get("model") or ""),
+                base_url=str(recall_config.get("base_url") or ""),
+                duration_ms=round((time.perf_counter() - recall_tick) * 1000, 2),
+                ok=False,
+                error=str(exc.detail),
+            )
+            yield _step("语义召回", "skipped", f"{exc.detail}，已跳过语义召回", recall_tick)
+    else:
+        yield _step("语义召回", "skipped", "未开启语义召回，仅使用规则", time.perf_counter())
 
     config = model_config.load_config(user["id"])
     mode, model_error, model_meta = "demo", None, None

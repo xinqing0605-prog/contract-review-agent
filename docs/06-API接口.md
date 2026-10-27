@@ -267,6 +267,36 @@ data: {"detail":"Key 无效或已失效"}
 - `usage` 缺失的服务商按 0 计 token，不影响调用计数
 - 需要登录，未登录返回 401
 
+## 语义召回设置
+
+### GET /api/settings/recall
+
+```json
+{
+  "settings": { "enabled": true, "model_id": "mdl-abc123", "threshold": 0.82 },
+  "models": [
+    { "id": "mdl-abc123", "name": "text-embedding-v3", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "service": "百炼", "configured": true }
+  ],
+  "bounds": { "min": 0.6, "max": 0.95, "default": 0.82 }
+}
+```
+
+`models` 只返回当前账号已添加的模型，`configured=false` 表示没填 Key，前端置灰。
+
+### PUT /api/settings/recall
+
+```json
+{ "enabled": true, "model_id": "mdl-abc123", "threshold": 0.82 }
+```
+
+- `enabled=true` 但 `model_id` 为空 → 409「开启语义召回前请先选择一个向量模型」
+- 模型不属于当前账号 → 404
+- 模型没填 Key → 409
+- 阈值超出 0.60–0.95 → 422（Pydantic 校验）
+
+返回结构与 GET 一致。
+
 ## 报告
 
 ### GET /api/report/{id}
