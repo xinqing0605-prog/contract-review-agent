@@ -135,6 +135,33 @@ class RecallTests(unittest.TestCase):
         )
         self.assertAlmostEqual(low["threshold"], semantic.MIN_THRESHOLD, places=3)
 
+    def test_recalled_payment_paraphrase_is_high_risk(self):
+        """「三个月结清 + 逾期不计息」属于长账期，风险应被细化成 high。"""
+        clauses, _, _ = semantic.recall(
+            "doc-x",
+            "双方约定账期为交付完成后的第三个月结清，逾期不计息。",
+            [],
+            config={"base_url": "https://example.com/v1", "model": "fake", "api_key": "k"},
+            threshold=0.82,
+            embed_fn=fake_embed,
+        )
+        self.assertEqual(len(clauses), 1)
+        self.assertEqual(clauses[0]["title"], "付款与验收")
+        self.assertEqual(clauses[0]["risk"], "high")
+
+    def test_recalled_clause_without_long_term_stays_medium(self):
+        clauses, _, _ = semantic.recall(
+            "doc-x",
+            "双方约定按季度结算相关服务费用。",
+            [],
+            config={"base_url": "https://example.com/v1", "model": "fake", "api_key": "k"},
+            threshold=0.5,
+            embed_fn=fake_embed,
+        )
+        for clause in clauses:
+            if clause["title"] == "付款与验收":
+                self.assertEqual(clause["risk"], "medium")
+
     def test_unrelated_sentence_not_recalled(self):
         clauses, _, _ = semantic.recall(
             "doc-x",

@@ -11,13 +11,20 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
-from .detector import EXCERPT_CHARS, MAX_CLAUSE_CHARS, SENTENCE_END
+from .detector import EXCERPT_CHARS, MAX_CLAUSE_CHARS, SENTENCE_END, Pattern, refine_risk
 from .semantic_patterns import (
     RECOMMEND_OF_TITLE,
     REASON_OF_TITLE,
     RISK_OF_TITLE,
     SEMANTIC_PATTERNS,
 )
+
+# refine_risk 只用到 title，这里复用它做风险复核，保证与规则路径口径一致
+_PATTERN_SHIMS = {
+    title: Pattern(title=title, regex="", risk=RISK_OF_TITLE.get(title, "medium"),
+                   reason="", recommend="")
+    for title in SEMANTIC_PATTERNS
+}
 
 DEFAULT_THRESHOLD = 0.82
 MIN_THRESHOLD = 0.60
@@ -127,12 +134,18 @@ def recall(
             continue
 
         excerpt = body if len(body) <= EXCERPT_CHARS else body[:EXCERPT_CHARS] + "…"
+        shim = _PATTERN_SHIMS.get(best_title)
+        risk = (
+            refine_risk(shim, body, text)
+            if shim is not None
+            else RISK_OF_TITLE.get(best_title, "medium")
+        )
         clauses.append(
             {
                 "id": "",  # 由调用方统一编号
                 "document_id": document_id,
                 "title": best_title,
-                "risk": RISK_OF_TITLE.get(best_title, "medium"),
+                "risk": risk,
                 "excerpt": excerpt,
                 "original": body,
                 "reason": f"{REASON_OF_TITLE.get(best_title, '')}（语义相似：{best_pattern[:24]}…）",

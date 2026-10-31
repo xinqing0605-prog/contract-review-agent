@@ -148,7 +148,11 @@ def refine_risk(pattern: Pattern, clause_text: str, full_text: str) -> str:
     那「风险分级」就只是标签映射。这里给出可验证的复核规则。
     """
     if pattern.title == "付款与验收":
-        if re.search(r"(六十|九十|60|90)\s*日", clause_text) or "逾期付款不承担" in clause_text:
+        # 账期表述既有「九十日」也有「三个月 / 90 天」，都按长账期处理
+        long_term = re.search(r"(六十|九十|60|90)\s*(日|天)", clause_text) or re.search(
+            r"(三|叁|3)\s*个月", clause_text
+        )
+        if long_term or "逾期付款不承担" in clause_text or "逾期不计息" in clause_text:
             return "high"
         return "medium"
     if pattern.title == "责任限制":
