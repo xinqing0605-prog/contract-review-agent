@@ -368,6 +368,15 @@ export function ModelSettings({ open, onClose }: Props) {
                                   当前使用
                                 </span>
                               ) : null}
+                              {model.capability === 'embedding' ? (
+                                <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] text-sky-700">
+                                  向量模型
+                                </span>
+                              ) : model.capability === 'chat' ? (
+                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-600">
+                                  对话模型
+                                </span>
+                              ) : null}
                             </div>
                             <p className="mt-0.5 truncate text-[10px] text-slate-500">
                               {model.description || '未填写说明'} · {selected.kind} · {selected.name}
@@ -400,7 +409,7 @@ export function ModelSettings({ open, onClose }: Props) {
                           >
                             {busy === `test-${model.id}` ? '测试中…' : '测试连接'}
                           </button>
-                          {!model.is_active ? (
+                          {!model.is_active && model.capability !== 'embedding' ? (
                             <button
                               type="button"
                               disabled={busy !== null}

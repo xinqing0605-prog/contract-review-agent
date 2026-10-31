@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS service_models(
   api_key_enc TEXT DEFAULT '',
   key_hint TEXT DEFAULT '',
   is_active INTEGER DEFAULT 0,
+  capability TEXT DEFAULT '',
   verified_at TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT,
@@ -270,6 +271,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     audit_columns = _columns(conn, "review_audit")
     if "user_id" not in audit_columns:
         conn.execute("ALTER TABLE review_audit ADD COLUMN user_id TEXT")
+
+    model_columns = _columns(conn, "service_models")
+    if "capability" not in model_columns:
+        # chat（对话）/ embedding（向量）/ 空（未测试）
+        conn.execute("ALTER TABLE service_models ADD COLUMN capability TEXT DEFAULT ''")
 
     user_columns = _columns(conn, "users")
     if "presets_seeded" not in user_columns:

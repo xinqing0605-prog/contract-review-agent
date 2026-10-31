@@ -18,6 +18,7 @@ export interface ServiceModel {
   key_hint: string
   configured: boolean
   is_active: boolean
+  capability: string
   verified_at: string | null
 }
 
@@ -52,6 +53,7 @@ export interface RecallModelOption {
   base_url: string
   service: string
   configured: boolean
+  capability: string
 }
 
 export interface RecallSettings {

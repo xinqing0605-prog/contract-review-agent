@@ -45,10 +45,10 @@ def load(user_id: str) -> dict[str, Any]:
 
 
 def available_models(user_id: str) -> list[dict[str, Any]]:
-    """当前用户已配置 Key 的模型，供下拉选择。"""
+    """当前用户已配置 Key 的模型，供下拉选择；capability 供前端过滤。"""
     with db.tx() as conn:
         rows = conn.execute(
-            "SELECT m.id, m.name, m.base_url, m.api_key_enc, s.name AS service_name "
+            "SELECT m.id, m.name, m.base_url, m.api_key_enc, m.capability, s.name AS service_name "
             "FROM service_models m JOIN model_services s ON s.id = m.service_id "
             "WHERE m.user_id=? ORDER BY s.name, m.name",
             (user_id,),
@@ -60,6 +60,7 @@ def available_models(user_id: str) -> list[dict[str, Any]]:
             "base_url": row["base_url"],
             "service": row["service_name"],
             "configured": bool(row["api_key_enc"]),
+            "capability": row["capability"] or "",
         }
         for row in rows
     ]

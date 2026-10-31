@@ -13,6 +13,9 @@ export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => v
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  // 只列确认支持 /embeddings 的模型；对话模型不该出现在这里
+  const vectorModels = models.filter((model) => model.capability === 'embedding')
+
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -106,17 +109,23 @@ export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => v
                 className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700"
               >
                 <option value="">未选择</option>
-                {models.map((model) => (
+                {vectorModels.map((model) => (
                   <option key={model.id} value={model.id} disabled={!model.configured}>
                     {model.service} · {model.name}
                     {model.configured ? '' : '（缺少 Key）'}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
-                需要服务商支持 <code>/embeddings</code> 接口，例如通义 text-embedding-v3、
-                OpenAI text-embedding-3-small、BAAI/bge-m3。先在「模型设置」里添加该模型。
-              </p>
+              {vectorModels.length === 0 ? (
+                <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] leading-relaxed text-amber-700">
+                  还没有可用的向量模型。请到「模型设置」添加一个支持 <code>/embeddings</code> 的模型
+                  （如通义 text-embedding-v3、BAAI/bge-m3），点「测试连接」确认后会出现在这里。
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                  只列出已确认为向量模型的条目。审阅用的对话模型在顶部「模型设置」里单独选择，两者互不影响。
+                </p>
+              )}
             </div>
 
             <div>

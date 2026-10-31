@@ -221,6 +221,15 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
     config = model_config.load_config(user["id"])
     mode, model_error, model_meta = "demo", None, None
 
+    if config and config.get("capability") == "embedding":
+        yield _step(
+            "模型审阅",
+            "skipped",
+            f"{config['model']} 是向量模型，不能做审阅；请到「模型设置」把对话模型设为当前使用",
+            time.perf_counter(),
+        )
+        config = None
+
     if clauses and config and config.get("api_key"):
         tick = time.perf_counter()
         yield _step("模型审阅", "running", f"{config['model']} @ {config['base_url']}", tick)

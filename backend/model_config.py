@@ -115,6 +115,7 @@ def list_services(user_id: str) -> list[dict[str, Any]]:
                 "key_hint": row["key_hint"] or "",
                 "configured": bool(row["api_key_enc"]),
                 "is_active": bool(row["is_active"]),
+                "capability": row["capability"] or "",
                 "verified_at": row["verified_at"],
             }
         )
@@ -134,14 +135,14 @@ def load_config(user_id: str) -> dict[str, Any] | None:
     """审阅用：当前使用的模型（含地址与 Key）。函数名保持不变，app.py 无需改动。"""
     with db.tx() as conn:
         row = conn.execute(
-            "SELECT m.base_url, m.api_key_enc, m.name AS model, s.name AS service "
+            "SELECT m.base_url, m.api_key_enc, m.name AS model, m.capability, s.name AS service "
             "FROM service_models m JOIN model_services s ON s.id = m.service_id "
             "WHERE m.user_id=? AND m.is_active=1 LIMIT 1",
             (user_id,),
         ).fetchone()
         if not row:
             row = conn.execute(
-                "SELECT m.base_url, m.api_key_enc, m.name AS model, s.name AS service "
+                "SELECT m.base_url, m.api_key_enc, m.name AS model, m.capability, s.name AS service "
                 "FROM service_models m JOIN model_services s ON s.id = m.service_id "
                 "WHERE m.user_id=? ORDER BY m.created_at LIMIT 1",
                 (user_id,),
@@ -152,6 +153,7 @@ def load_config(user_id: str) -> dict[str, Any] | None:
         "base_url": row["base_url"],
         "model": row["model"],
         "name": row["service"],
+        "capability": row["capability"] or "",
         "api_key": _decrypt(row["api_key_enc"]),
     }
 
@@ -360,7 +362,11 @@ def delete_model(service_id: str, model_id: str, user: dict = Depends(current_us
 def activate_model(
     service_id: str, model_id: str, user: dict = Depends(current_user)
 ) -> dict[str, Any]:
-    _model_or_404(service_id, model_id, user["id"])
+    row = _model_or_404(service_id, model_id, user["id"])
+    if (row["capability"] or "") == "embedding":
+        raise HTTPException(
+            409, "这是向量模型，不能设为当前审阅模型；请选择对话模型（语义召回里单独选向量模型）"
+        )
     with db.tx() as conn:
         conn.execute("UPDATE service_models SET is_active=0 WHERE user_id=?", (user["id"],))
         conn.execute("UPDATE service_models SET is_active=1 WHERE id=?", (model_id,))
@@ -429,7 +435,8 @@ def test_model(
     )
     with db.tx() as conn:
         conn.execute(
-            "UPDATE service_models SET verified_at=datetime('now') WHERE id=?", (model_id,)
+            "UPDATE service_models SET verified_at=datetime('now'), capability=? WHERE id=?",
+            ("embedding" if capability == "embedding" else "chat", model_id),
         )
     return {
         "ok": True,
