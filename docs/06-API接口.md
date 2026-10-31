@@ -1,4 +1,4 @@
-# 06 · API 接口
+﻿# 06 · API 接口
 
 Base URL：`http://127.0.0.1:8103`
 
@@ -222,6 +222,33 @@ data: {"detail":"Key 无效或已失效"}
 ```
 
 最长 1000 字。返回 `{ "status": "saved", "clause": {...} }`。
+
+### GET /api/clauses/{id}/similar?limit=3
+
+当前条款的相似历史处置：候选池为**同一账号、同一类别、已处置**的最近 50 条，按语义相似度排序，
+低于 0.55 不计入。未配置向量模型时 cases 为空、
+ote 说明原因。
+
+`json
+{
+  "cases": [
+    {
+      "clause_id": "doc-9-1",
+      "document_name": "去年的采购合同",
+      "title": "付款与验收",
+      "risk": "high",
+      "decision": "approved",
+      "decision_label": "已采纳",
+      "comment": "已与供应商确认改为 60 日",
+      "reject_reason": "",
+      "excerpt": "账期自交付之日起九十天，逾期不计利息。",
+      "score": 0.912,
+      "updated_at": "2026-10-01 10:00:00"
+    }
+  ],
+  "note": ""
+}
+`
 
 ## 审计
 

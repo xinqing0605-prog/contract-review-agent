@@ -80,6 +80,20 @@ export interface RecallProbeResult {
   results: RecallProbeItem[]
 }
 
+export interface SimilarCase {
+  clause_id: string
+  document_name: string
+  title: string
+  risk: string
+  decision: string
+  decision_label: string
+  comment: string
+  reject_reason: string
+  excerpt: string
+  score: number
+  updated_at: string | null
+}
+
 export interface LlmUsageTotals {
   calls: number
   ok: number
@@ -270,6 +284,11 @@ export const api = {
         // 幂等键：同一波点击重复提交时后端只处理一次
         headers: { 'Idempotency-Key': `${clauseId}-execute-${Date.now()}` },
       },
+    ),
+
+  similar: (clauseId: string, limit = 3) =>
+    request<{ cases: SimilarCase[]; note: string }>(
+      `/api/clauses/${encodeURIComponent(clauseId)}/similar?limit=${limit}`,
     ),
 
   comment: (clauseId: string, comment: string) =>

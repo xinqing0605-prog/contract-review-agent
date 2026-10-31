@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { api, type SimilarCase } from '../api/client'
 import type { Clause } from '../types'
 import { EmptyState, RiskBadge } from './ui'
 
@@ -21,10 +22,41 @@ export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment 
   const [draft, setDraft] = useState('')
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [cases, setCases] = useState<SimilarCase[]>([])
+  const [caseNote, setCaseNote] = useState('')
+  const [casesLoading, setCasesLoading] = useState(false)
 
   useEffect(() => {
     setDraft(clause?.comment ?? '')
   }, [clause?.id, clause?.comment])
+
+  useEffect(() => {
+    if (!clause?.id) {
+      setCases([])
+      setCaseNote('')
+      return
+    }
+    let cancelled = false
+    setCasesLoading(true)
+    setCases([])
+    setCaseNote('')
+    api
+      .similar(clause.id)
+      .then((body) => {
+        if (cancelled) return
+        setCases(body.cases)
+        setCaseNote(body.note)
+      })
+      .catch(() => {
+        if (!cancelled) setCaseNote('历史案例加载失败')
+      })
+      .finally(() => {
+        if (!cancelled) setCasesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clause?.id])
 
   if (!clause) {
     return <EmptyState title="选择一条条款" hint="点击原文里的高亮，或点击中间的条款卡片。" />
@@ -69,6 +101,47 @@ export function ClauseDetail({ clause, onDecide, onReject, onExecute, onComment 
           <p className="rounded-md bg-slate-50 p-2.5 text-xs leading-6 text-slate-700">
             {clause.recommend}
           </p>
+        </Block>
+
+        <Block label="相似历史处置">
+          {casesLoading ? (
+            <p className="text-[11px] text-slate-400">检索中…</p>
+          ) : cases.length > 0 ? (
+            <ul className="space-y-1.5">
+              {cases.map((item) => (
+                <li key={item.clause_id} className="rounded-md border border-slate-100 px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] font-medium text-slate-700">
+                      {item.document_name}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] ${
+                        item.decision === 'rejected'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {item.decision_label}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500">
+                    {item.excerpt}
+                  </p>
+                  {item.comment ? (
+                    <p className="mt-0.5 text-[10px] text-slate-600">批注：{item.comment}</p>
+                  ) : null}
+                  {item.reject_reason ? (
+                    <p className="mt-0.5 text-[10px] text-amber-700">
+                      驳回理由：{item.reject_reason}
+                    </p>
+                  ) : null}
+                  <p className="mt-0.5 text-[9px] text-slate-400">相似度 {item.score}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[11px] text-slate-400">{caseNote || '暂无相似历史案例'}</p>
+          )}
         </Block>
 
         <Block label="批注（会写进报告和审计）">

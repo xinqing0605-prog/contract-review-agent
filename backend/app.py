@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, db, llm_stats, model_config, recall_settings, semantic
+from . import auth, db, llm_stats, model_config, recall_settings, semantic, similar_cases
 from .auth import current_user
 from .detector import analyze_text  # noqa: F401  re-export 给测试
 from .ingest import extract_text
@@ -648,6 +648,22 @@ def comment_clause(
         updated = conn.execute(f"SELECT {CLAUSE_FIELDS} FROM clauses WHERE id=?", (clause_id,)).fetchone()
     audit(clause["document_id"], user["id"], "comment_clause", {"clause_id": clause_id})
     return {"status": "saved", "clause": dict(updated)}
+
+
+@app.get("/api/clauses/{clause_id}/similar")
+def similar_clause_cases(
+    clause_id: str, limit: int = 3, user: dict = Depends(current_user)
+) -> dict[str, Any]:
+    """当前条款的相似历史处置（同类别、已处置、语义相似）。"""
+    clause = owned_clause(clause_id, user["id"])
+    config = recall_settings.resolve_config(user["id"])
+    cases, note = similar_cases.find_similar(
+        user["id"],
+        clause,
+        config=config,
+        limit=max(1, min(int(limit or 3), 5)),
+    )
+    return {"cases": cases, "note": note}
 
 
 @app.get("/api/documents/{doc_id}/audit")
