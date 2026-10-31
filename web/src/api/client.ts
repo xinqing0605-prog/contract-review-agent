@@ -68,6 +68,18 @@ export interface RecallSettingsInput {
   threshold: number
 }
 
+export interface RecallProbeItem {
+  format: string
+  ok: boolean
+  dimensions?: number
+  detail: string
+}
+
+export interface RecallProbeResult {
+  model: string
+  results: RecallProbeItem[]
+}
+
 export interface LlmUsageTotals {
   calls: number
   ok: number
@@ -340,6 +352,11 @@ export const api = {
       request<RecallSettings>('/api/settings/recall', {
         method: 'PUT',
         body: JSON.stringify(input),
+      }),
+    probe: (modelId: string) =>
+      request<RecallProbeResult>('/api/settings/recall/probe', {
+        method: 'POST',
+        body: JSON.stringify({ enabled: true, model_id: modelId, threshold: 0.82 }),
       }),
   },
 

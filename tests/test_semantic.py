@@ -167,11 +167,16 @@ class EmbeddingFormatTests(unittest.TestCase):
     """不同服务商的向量协议差异：OpenAI 标准 vs 千问多模态 input.contents。"""
 
     def test_payload_variants_cover_both_protocols(self):
-        from backend.embeddings import _payload_variants
+        from backend.embeddings import payload_variants
 
-        variants = _payload_variants("m", ["a", "b"])
-        self.assertEqual(variants[0]["input"], ["a", "b"])
-        self.assertEqual(variants[1]["input"]["contents"][0]["text"], "a")
+        variants = dict(payload_variants("m", ["a", "b"]))
+        self.assertEqual(variants["input 数组"]["input"], ["a", "b"])
+        self.assertEqual(variants["input.contents[{text}]"]["input"]["contents"][0]["text"], "a")
+        self.assertEqual(variants["input.contents[str]"]["input"]["contents"], ["a", "b"])
+        self.assertEqual(
+            variants["input.contents[{type,text}]"]["input"]["contents"][1],
+            {"type": "text", "text": "b"},
+        )
 
     def test_extract_supports_openai_shape(self):
         from backend.embeddings import _extract_embeddings

@@ -113,16 +113,21 @@ def _save_cached(model: str, items: list[tuple[str, list[float]]]) -> None:
         pass
 
 
-def _payload_variants(model: str, texts: list[str]) -> list[dict[str, Any]]:
-    """标准 OpenAI 格式优先；部分平台（如千问多模态向量）要求 input.contents。"""
+def payload_variants(model: str, texts: list[str]) -> list[tuple[str, dict[str, Any]]]:
+    """按兼容性从高到低排列的请求体候选，带可读标签方便排查。"""
     return [
-        {"model": model, "input": texts},
-        {"model": model, "input": {"contents": [{"text": text} for text in texts]}},
+        ("input 数组", {"model": model, "input": texts}),
+        ("input.contents[{text}]", {"model": model, "input": {"contents": [{"text": text} for text in texts]}}),
+        ("input.contents[str]", {"model": model, "input": {"contents": list(texts)}}),
+        (
+            "input.contents[{type,text}]",
+            {"model": model, "input": {"contents": [{"type": "text", "text": text} for text in texts]}},
+        ),
     ]
 
 
 def _extract_embeddings(data: dict[str, Any], expected: int) -> list[list[float]]:
-    """兼容两种响应：data[].embedding（OpenAI）与 output.embeddings[].embedding。"""
+    """兼容多种响应：data[].embedding、output.embeddings[].embedding。"""
     rows = data.get("data")
     if not isinstance(rows, list):
         output = data.get("output")
@@ -139,19 +144,40 @@ def _extract_embeddings(data: dict[str, Any], expected: int) -> list[list[float]
 
 
 def _post_batch(url: str, model: str, texts: list[str], api_key: str) -> tuple[list[list[float]], dict[str, Any]]:
-    """按批次请求；标准格式被拒时自动换 input.contents 再试一次。"""
-    last_error: HTTPException | None = None
-    for payload in _payload_variants(model, texts):
+    """按批次请求；逐个尝试格式候选，返回第一个成功的。"""
+    failures: list[str] = []
+    for label, payload in payload_variants(model, texts):
         try:
             data = _post(url, payload, api_key)
         except HTTPException as exc:
-            last_error = exc
-            message = str(exc.detail)
-            if "input.contents" in message or "contents" in message:
-                continue
-            raise
+            failures.append(f"{label}：{exc.detail}")
+            continue
         return _extract_embeddings(data, len(texts)), data.get("usage") or {}
-    raise last_error or HTTPException(502, "向量服务拒绝了请求")
+    raise HTTPException(502, "所有向量请求格式都被拒绝 → " + "；".join(failures))
+
+
+def probe_formats(config: dict[str, Any], text: str = "连接测试") -> list[dict[str, Any]]:
+    """逐个尝试请求格式，返回每种格式的结果，用于一次性定位服务商支持的格式。"""
+    base_url = (config.get("base_url") or "").strip()
+    api_key = (config.get("api_key") or "").strip()
+    model = (config.get("model") or "").strip()
+    if not base_url or not model or not api_key:
+        raise HTTPException(409, "向量模型配置不完整（缺少地址、模型名或 Key）")
+    url = endpoint_of(base_url)
+    results: list[dict[str, Any]] = []
+    for label, payload in payload_variants(model, [text]):
+        try:
+            data = _post(url, payload, api_key)
+        except HTTPException as exc:
+            results.append({"format": label, "ok": False, "detail": str(exc.detail)})
+            continue
+        try:
+            vectors = _extract_embeddings(data, 1)
+        except HTTPException as exc:
+            results.append({"format": label, "ok": False, "detail": f"响应结构不匹配：{exc.detail}"})
+            continue
+        results.append({"format": label, "ok": True, "dimensions": len(vectors[0]), "detail": ""})
+    return results
 
 
 def embed_texts(

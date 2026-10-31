@@ -297,6 +297,23 @@ data: {"detail":"Key 无效或已失效"}
 
 返回结构与 GET 一致。
 
+### POST /api/settings/recall/probe
+
+用指定模型逐个尝试向量请求格式（`input` 数组 + `input.contents` 的三种变体），每种真实请求一次，
+返回是否被接受。用于排查「服务商到底要哪种格式」。
+
+```json
+{
+  "model": "qwen3.7-text-embedding-flash",
+  "results": [
+    { "format": "input 数组", "ok": false, "detail": "…Field required: input.contents" },
+    { "format": "input.contents[{text}]", "ok": true, "dimensions": 1024, "detail": "" }
+  ]
+}
+```
+
+不落库、不写向量缓存，可反复调用。
+
 ## 报告
 
 ### GET /api/report/{id}

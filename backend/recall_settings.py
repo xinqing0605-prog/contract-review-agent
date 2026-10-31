@@ -95,6 +95,38 @@ def _view(user_id: str) -> dict[str, Any]:
     }
 
 
+@router.post("/probe")
+def probe(body: RecallSettingsInput, user: dict = Depends(current_user)) -> dict[str, Any]:
+    """用指定模型逐个尝试向量请求格式，返回每种格式的结果（不落库、不写缓存）。"""
+    model_id = body.model_id.strip()
+    if not model_id:
+        raise HTTPException(409, "请先选择一个向量模型")
+    models = {item["id"]: item for item in available_models(user["id"])}
+    target = models.get(model_id)
+    if target is None:
+        raise HTTPException(404, "选择的模型不存在")
+    if not target["configured"]:
+        raise HTTPException(409, "该模型还没有填写 API Key")
+    with db.tx() as conn:
+        row = conn.execute(
+            "SELECT name, base_url, api_key_enc FROM service_models WHERE id=? AND user_id=?",
+            (model_id, user["id"]),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "选择的模型不存在")
+    try:
+        api_key = decrypt_secret(row["api_key_enc"], db.DATA_DIR)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(409, "无法解密该模型的 API Key，请重新填写") from None
+
+    from .embeddings import probe_formats
+
+    results = probe_formats(
+        {"base_url": row["base_url"], "model": row["name"], "api_key": api_key}
+    )
+    return {"model": row["name"], "results": results}
+
+
 @router.get("")
 def read_settings(user: dict = Depends(current_user)) -> dict[str, Any]:
     return _view(user["id"])

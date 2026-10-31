@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errorMessage, type RecallSettings } from '../api/client'
+import { api, errorMessage, type RecallProbeItem, type RecallSettings } from '../api/client'
 import { CloseButton, Spinner } from './ui'
 
 export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -12,6 +12,8 @@ export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => v
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [probing, setProbing] = useState(false)
+  const [probeResults, setProbeResults] = useState<RecallProbeItem[] | null>(null)
 
   // 只列确认支持 /embeddings 的模型；对话模型不该出现在这里
   const vectorModels = models.filter((model) => model.capability === 'embedding')
@@ -55,6 +57,24 @@ export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => v
       setError(errorMessage(err))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleProbe() {
+    if (!modelId) {
+      setError('请先选择向量模型')
+      return
+    }
+    setProbing(true)
+    setError('')
+    setProbeResults(null)
+    try {
+      const body = await api.recall.probe(modelId)
+      setProbeResults(body.results)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setProbing(false)
     }
   }
 
@@ -126,6 +146,40 @@ export function RecallPanel({ open, onClose }: { open: boolean; onClose: () => v
                   只列出已确认为向量模型的条目。审阅用的对话模型在顶部「模型设置」里单独选择，两者互不影响。
                 </p>
               )}
+
+              <button
+                type="button"
+                onClick={() => void handleProbe()}
+                disabled={probing || !modelId}
+                className="mt-2 rounded-md border border-slate-200 px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                {probing ? '探测中…' : '测试向量接口'}
+              </button>
+
+              {probeResults ? (
+                <ul className="mt-2 space-y-1">
+                  {probeResults.map((item) => (
+                    <li
+                      key={item.format}
+                      className={`rounded-md border px-2 py-1 text-[10px] leading-relaxed ${
+                        item.ok
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-slate-50 text-slate-500'
+                      }`}
+                    >
+                      <span className="font-medium">
+                        {item.ok ? '✓' : '×'} {item.format}
+                      </span>
+                      {item.ok ? `　维度 ${item.dimensions}` : `　${item.detail.slice(0, 90)}`}
+                    </li>
+                  ))}
+                  {probeResults.every((item) => !item.ok) ? (
+                    <li className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-relaxed text-amber-700">
+                      四种格式都被拒绝。把上面第一条错误发我，我按服务商文档再调。
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
             </div>
 
             <div>
