@@ -23,7 +23,8 @@ from . import db
 
 TIMEOUT_SECONDS = 60
 MAX_RESPONSE_BYTES = 8_000_000
-BATCH_SIZE = 32
+# 千问向量接口单次最多 25 条，超了直接 400（batch size is invalid）
+BATCH_SIZE = 25
 MAX_TEXTS = 400
 
 
@@ -143,14 +144,31 @@ def _extract_embeddings(data: dict[str, Any], expected: int) -> list[list[float]
     return vectors
 
 
+def _merge_usage(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        try:
+            merged[field] = int(left.get(field) or 0) + int(right.get(field) or 0)
+        except (TypeError, ValueError):
+            merged[field] = 0
+    return merged
+
+
 def _post_batch(url: str, model: str, texts: list[str], api_key: str) -> tuple[list[list[float]], dict[str, Any]]:
-    """按批次请求；逐个尝试格式候选，返回第一个成功的。"""
+    """按批次请求；格式逐个尝试，批量超限时对半拆分。"""
     failures: list[str] = []
     for label, payload in payload_variants(model, texts):
         try:
             data = _post(url, payload, api_key)
         except HTTPException as exc:
-            failures.append(f"{label}：{exc.detail}")
+            message = str(exc.detail)
+            # 服务商限制单批条数：拆成两半递归，直到单条
+            if "batch size" in message and len(texts) > 1:
+                middle = len(texts) // 2
+                left_vectors, left_usage = _post_batch(url, model, texts[:middle], api_key)
+                right_vectors, right_usage = _post_batch(url, model, texts[middle:], api_key)
+                return left_vectors + right_vectors, _merge_usage(left_usage, right_usage)
+            failures.append(f"{label}：{message}")
             continue
         return _extract_embeddings(data, len(texts)), data.get("usage") or {}
     raise HTTPException(502, "所有向量请求格式都被拒绝 → " + "；".join(failures))

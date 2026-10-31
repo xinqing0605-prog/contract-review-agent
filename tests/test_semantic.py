@@ -199,6 +199,41 @@ class EmbeddingFormatTests(unittest.TestCase):
             _extract_embeddings({"data": [{"embedding": [1]}]}, 2)
 
 
+class EmbeddingBatchTests(unittest.TestCase):
+    """部分服务商限制单批条数（千问：≤25），代码要对半拆到能过为止。"""
+
+    def test_splits_batch_when_provider_rejects_size(self):
+        from fastapi import HTTPException
+
+        from backend import embeddings
+
+        calls: list[int] = []
+        original = embeddings._post
+
+        def fake_post(url, payload, api_key):
+            texts = payload["input"] if isinstance(payload.get("input"), list) else []
+            calls.append(len(texts))
+            if len(texts) > 2:
+                raise HTTPException(
+                    502, "请求被服务商拒绝：<400> batch size is invalid, it should not be larger than 2"
+                )
+            return {"data": [{"embedding": [1.0, 0.0]} for _ in texts]}
+
+        embeddings._post = fake_post
+        try:
+            vectors, usage = embeddings._post_batch(
+                "https://example.com/v1/embeddings", "m", ["a", "b", "c", "d", "e"], "k"
+            )
+        finally:
+            embeddings._post = original
+
+        self.assertEqual(len(vectors), 5)
+        self.assertEqual(vectors[0], [1.0, 0.0])
+        self.assertLessEqual(max(calls), 5)
+        self.assertGreaterEqual(len(calls), 3)  # 必然经历过拆分
+        self.assertEqual(usage["total_tokens"], 0)
+
+
 class RecallSettingsApiTests(unittest.TestCase):
     def test_requires_login(self):
         self.assertEqual(make_client().get("/api/settings/recall").status_code, 401)
