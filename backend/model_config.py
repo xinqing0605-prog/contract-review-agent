@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from . import db, llm_stats, provider
+from . import db, embeddings, llm_stats, provider
 from .auth import current_user
 from .security import decrypt_secret, encrypt_secret, key_hint
 
@@ -375,36 +375,49 @@ def test_model(
     api_key = _decrypt(row["api_key_enc"])
     if not api_key:
         raise HTTPException(409, "这个模型还没有填写 API Key")
+    config = {"base_url": row["base_url"], "model": row["name"], "api_key": api_key}
     started = time.perf_counter()
+    capability = "chat"
+    meta: dict[str, Any] = {}
+    chat_error = ""
+
     try:
         result, meta = provider.complete_json(
-            {"base_url": row["base_url"], "model": row["name"], "api_key": api_key},
+            config,
             '这是连接验证，请返回 {"ok": true}。',
             {"task": "connection_check"},
             max_tokens=64,
         )
+        if result.get("ok") is not True:
+            raise HTTPException(502, "模型返回了内容，但不符合 JSON 格式要求")
     except HTTPException as exc:
-        llm_stats.record(
-            user_id=user["id"],
-            purpose="connection_check",
-            model=str(row["name"] or ""),
-            base_url=str(row["base_url"] or ""),
-            duration_ms=round((time.perf_counter() - started) * 1000, 2),
-            ok=False,
-            error=str(exc.detail),
-        )
-        raise HTTPException(502, str(exc.detail)) from None
-    if result.get("ok") is not True:
-        llm_stats.record(
-            user_id=user["id"],
-            purpose="connection_check",
-            model=str(row["name"] or ""),
-            base_url=str(row["base_url"] or ""),
-            duration_ms=round((time.perf_counter() - started) * 1000, 2),
-            ok=False,
-            error="模型返回内容不符合 JSON 格式要求",
-        )
-        raise HTTPException(502, "模型返回了内容，但不符合 JSON 格式要求")
+        chat_error = str(exc.detail)
+        # 向量模型没有 /chat/completions：改用 /embeddings 再验一次
+        try:
+            vectors, embed_usage = embeddings.embed_texts(config, ["连接测试"])
+            if not vectors:
+                raise HTTPException(502, "向量接口没有返回结果")
+            capability = "embedding"
+            meta = {
+                "model": row["name"],
+                "usage": embed_usage,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            }
+        except HTTPException as embed_exc:
+            llm_stats.record(
+                user_id=user["id"],
+                purpose="connection_check",
+                model=str(row["name"] or ""),
+                base_url=str(row["base_url"] or ""),
+                duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                ok=False,
+                error=f"对话接口：{chat_error}；向量接口：{embed_exc.detail}",
+            )
+            raise HTTPException(
+                502,
+                f"对话接口不可用（{chat_error}），向量接口也不可用（{embed_exc.detail}）",
+            ) from None
+
     llm_stats.record(
         user_id=user["id"],
         purpose="connection_check",
@@ -422,6 +435,7 @@ def test_model(
         "ok": True,
         "model": meta.get("model", row["name"]),
         "duration_ms": meta.get("duration_ms"),
+        "capability": capability,
         "services": list_services(user["id"]),
     }
 

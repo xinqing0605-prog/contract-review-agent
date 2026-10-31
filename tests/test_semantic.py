@@ -163,6 +163,37 @@ class RecallTests(unittest.TestCase):
         self.assertGreaterEqual(stats["skipped_by_overlap"], 1)
 
 
+class EmbeddingFormatTests(unittest.TestCase):
+    """不同服务商的向量协议差异：OpenAI 标准 vs 千问多模态 input.contents。"""
+
+    def test_payload_variants_cover_both_protocols(self):
+        from backend.embeddings import _payload_variants
+
+        variants = _payload_variants("m", ["a", "b"])
+        self.assertEqual(variants[0]["input"], ["a", "b"])
+        self.assertEqual(variants[1]["input"]["contents"][0]["text"], "a")
+
+    def test_extract_supports_openai_shape(self):
+        from backend.embeddings import _extract_embeddings
+
+        vectors = _extract_embeddings({"data": [{"embedding": [1, 2]}, {"embedding": [3, 4]}]}, 2)
+        self.assertEqual(vectors, [[1.0, 2.0], [3.0, 4.0]])
+
+    def test_extract_supports_output_shape(self):
+        from backend.embeddings import _extract_embeddings
+
+        data = {"output": {"embeddings": [{"embedding": [0.5, 0.5]}]}}
+        self.assertEqual(_extract_embeddings(data, 1), [[0.5, 0.5]])
+
+    def test_extract_rejects_mismatched_count(self):
+        from fastapi import HTTPException
+
+        from backend.embeddings import _extract_embeddings
+
+        with self.assertRaises(HTTPException):
+            _extract_embeddings({"data": [{"embedding": [1]}]}, 2)
+
+
 class RecallSettingsApiTests(unittest.TestCase):
     def test_requires_login(self):
         self.assertEqual(make_client().get("/api/settings/recall").status_code, 401)

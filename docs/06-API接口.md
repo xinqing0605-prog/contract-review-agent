@@ -386,13 +386,15 @@ curl.exe -OJ "http://127.0.0.1:8103/api/report/contract-01/export?format=docx" -
 
 ### POST /api/settings/services/{id}/models/{mid}/test
 
-真实调用 `POST {base_url}/chat/completions`，要求模型返回 `{"ok":true}`。
+先调 `POST {base_url}/chat/completions`，要求模型返回 `{"ok":true}`；
+如果失败（典型是向量模型没有对话接口），自动改用 `POST {base_url}/embeddings` 复验一次，任一通过即视为可用。
 
 ```json
-{ "ok": true, "model": "qwen-plus", "duration_ms": 1234, "services": [ ... ] }
+{ "ok": true, "model": "qwen-plus", "duration_ms": 1234, "capability": "chat", "services": [ ... ] }
 ```
 
-失败：`409` 未配置 Key；`502` 上游报错（消息会带服务商原始错误）。
+- `capability`：`chat`（对话模型）或 `embedding`（向量模型）
+- 失败：`409` 未配置 Key；`502` 两个接口都失败（消息里同时带两边的原始错误）
 
 ### 模板
 

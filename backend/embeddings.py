@@ -113,6 +113,47 @@ def _save_cached(model: str, items: list[tuple[str, list[float]]]) -> None:
         pass
 
 
+def _payload_variants(model: str, texts: list[str]) -> list[dict[str, Any]]:
+    """标准 OpenAI 格式优先；部分平台（如千问多模态向量）要求 input.contents。"""
+    return [
+        {"model": model, "input": texts},
+        {"model": model, "input": {"contents": [{"text": text} for text in texts]}},
+    ]
+
+
+def _extract_embeddings(data: dict[str, Any], expected: int) -> list[list[float]]:
+    """兼容两种响应：data[].embedding（OpenAI）与 output.embeddings[].embedding。"""
+    rows = data.get("data")
+    if not isinstance(rows, list):
+        output = data.get("output")
+        rows = output.get("embeddings") if isinstance(output, dict) else None
+    if not isinstance(rows, list) or len(rows) != expected:
+        raise HTTPException(502, "向量服务返回结构不符合预期（既不是 data[] 也不是 output.embeddings[]）")
+    vectors: list[list[float]] = []
+    for item in rows:
+        vector = item.get("embedding") if isinstance(item, dict) else None
+        if not isinstance(vector, list) or not vector:
+            raise HTTPException(502, "向量服务返回了空的 embedding")
+        vectors.append([float(value) for value in vector])
+    return vectors
+
+
+def _post_batch(url: str, model: str, texts: list[str], api_key: str) -> tuple[list[list[float]], dict[str, Any]]:
+    """按批次请求；标准格式被拒时自动换 input.contents 再试一次。"""
+    last_error: HTTPException | None = None
+    for payload in _payload_variants(model, texts):
+        try:
+            data = _post(url, payload, api_key)
+        except HTTPException as exc:
+            last_error = exc
+            message = str(exc.detail)
+            if "input.contents" in message or "contents" in message:
+                continue
+            raise
+        return _extract_embeddings(data, len(texts)), data.get("usage") or {}
+    raise last_error or HTTPException(502, "向量服务拒绝了请求")
+
+
 def embed_texts(
     config: dict[str, Any], texts: list[str], *, use_cache: bool = True
 ) -> tuple[list[list[float]], dict[str, Any]]:
@@ -139,24 +180,14 @@ def embed_texts(
     url = endpoint_of(base_url)
     for batch_start in range(0, len(missing), BATCH_SIZE):
         batch = missing[batch_start : batch_start + BATCH_SIZE]
-        payload = {"model": model, "input": [texts[index] for index in batch]}
-        data = _post(url, payload, api_key)
-
-        rows = data.get("data")
-        if not isinstance(rows, list) or len(rows) != len(batch):
-            raise HTTPException(502, "向量服务返回结构不符合 OpenAI 格式")
+        vectors_batch, batch_usage = _post_batch(url, model, [texts[index] for index in batch], api_key)
 
         fresh: list[tuple[str, list[float]]] = []
-        for index, item in zip(batch, rows):
-            vector = item.get("embedding") if isinstance(item, dict) else None
-            if not isinstance(vector, list) or not vector:
-                raise HTTPException(502, "向量服务返回了空的 embedding")
-            values = [float(value) for value in vector]
-            cached[keys[index]] = values
-            fresh.append((keys[index], values))
+        for index, vector in zip(batch, vectors_batch):
+            cached[keys[index]] = vector
+            fresh.append((keys[index], vector))
         _save_cached(model, fresh)
 
-        batch_usage = data.get("usage") or {}
         for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
             try:
                 usage[field] += int(batch_usage.get(field) or 0)
