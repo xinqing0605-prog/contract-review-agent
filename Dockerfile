@@ -18,6 +18,9 @@ COPY backend/requirements.txt backend/
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r backend/requirements.txt
 
 COPY backend/ backend/
+# eval/ 是评测数据集与脚本：tests/test_semantic_eval.py 依赖它，
+# 容器内跑 `python eval/run_semantic_eval.py --from-db` 也需要它
+COPY eval/ eval/
 COPY --from=web /app/web/dist web/dist
 
 RUN mkdir -p /data
