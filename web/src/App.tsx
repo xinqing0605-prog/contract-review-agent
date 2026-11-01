@@ -5,6 +5,7 @@ import { AuthScreen } from './components/AuthScreen'
 import { ClauseDetail } from './components/ClauseDetail'
 import { ClauseList } from './components/ClauseList'
 import { DocumentPanel } from './components/DocumentPanel'
+import { HeaderActions } from './components/HeaderActions'
 import { MetricsBar } from './components/MetricsBar'
 import { ModelSettings } from './components/ModelSettings'
 import { PasteDialog } from './components/PasteDialog'
@@ -52,7 +53,6 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
   const [composing, setComposing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
   const [usageOpen, setUsageOpen] = useState(false)
   const [recallOpen, setRecallOpen] = useState(false)
 
@@ -95,123 +95,61 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
   return (
     <div className="flex min-h-screen flex-col xl:h-screen xl:min-h-0 xl:overflow-hidden">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-nowrap items-center gap-2 px-4 py-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-[11px] font-bold text-white">
             CG
           </div>
-          <div className="min-w-0">
-            <h1 className="text-sm font-semibold leading-tight text-slate-900">ClauseGuard</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-semibold leading-tight text-slate-900">ClauseGuard</h1>
             <p className="hidden truncate text-[10px] text-slate-500 sm:block">
               合同审阅工作台 · 条款定位 / 风险分级 / 人工确认
             </p>
           </div>
 
-          <span className="ml-2 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500">
+          <span className="ml-2 hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 md:inline-flex">
             <i className={`h-1.5 w-1.5 rounded-full ${connection.tone}`} aria-hidden />
             {connection.label}
           </span>
 
           <span
             title="当前审阅使用的模型"
-            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700"
+            className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 lg:inline-flex"
           >
             <i className="h-1.5 w-1.5 rounded-full bg-slate-900" aria-hidden />
             {activeModel ?? '未配置模型'}
           </span>
 
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => void workspace.refresh()}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              刷新
-            </button>
-            <button
-              type="button"
-              onClick={() => void workspace.openAudit()}
-              disabled={!workspace.activeDocument}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-            >
-              审计
-            </button>
-            <button
-              type="button"
-              onClick={() => setUsageOpen(true)}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              用量
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecallOpen(true)}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              语义召回
-            </button>
+          <HeaderActions
+            canAudit={Boolean(workspace.activeDocument)}
+            canExport={Boolean(workspace.activeDocument) && workspace.clauses.length > 0}
+            canReview={canReview}
+            reviewing={workspace.reviewing}
+            onRefresh={() => void workspace.refresh()}
+            onAudit={() => void workspace.openAudit()}
+            onUsage={() => setUsageOpen(true)}
+            onRecall={() => setRecallOpen(true)}
+            onSettings={() => setSettingsOpen(true)}
+            onReview={() => void workspace.runReview()}
+            onExport={(format) => {
+              if (!workspace.activeDocument) return
+              window.open(api.exportUrl(workspace.activeDocument.id, format), '_blank')
+            }}
+          />
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setExportOpen((value) => !value)}
-                disabled={!workspace.activeDocument || workspace.clauses.length === 0}
-                className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-              >
-                导出报告
-              </button>
-              {exportOpen ? (
-                <div className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                  {(['docx', 'md'] as const).map((format) => (
-                    <button
-                      key={format}
-                      type="button"
-                      onClick={() => {
-                        if (!workspace.activeDocument) return
-                        window.open(api.exportUrl(workspace.activeDocument.id, format), '_blank')
-                        setExportOpen(false)
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
-                    >
-                      {format === 'docx' ? 'Word (.docx)' : 'Markdown (.md)'}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-            >
-              模型设置
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void workspace.runReview()}
-              disabled={!canReview}
-              className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {workspace.reviewing ? <Spinner className="h-3 w-3" /> : null}
-              {workspace.reviewing ? '审阅中' : '运行审阅'}
-            </button>
-
-            <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
-            <span
-              className="max-w-[140px] truncate text-[11px] text-slate-500"
-              title={user.email ?? user.username ?? ''}
-            >
-              {user.email ?? user.username ?? '未命名'}
-            </span>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="rounded-md px-2 py-1.5 text-[11px] text-slate-500 hover:bg-slate-100"
-            >
-              退出
-            </button>
-          </div>
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 md:block" aria-hidden />
+          <span
+            className="hidden max-w-[140px] truncate text-[11px] text-slate-500 md:inline"
+            title={user.email ?? user.username ?? ''}
+          >
+            {user.email ?? user.username ?? '未命名'}
+          </span>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="shrink-0 whitespace-nowrap rounded-md px-2 py-1.5 text-[11px] text-slate-500 hover:bg-slate-100"
+          >
+            退出
+          </button>
         </div>
       </header>
 
