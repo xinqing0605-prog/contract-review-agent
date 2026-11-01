@@ -1,0 +1,175 @@
+{
+  "task": "semantic_recall",
+  "summary": {
+    "positives": 12,
+    "negatives": 6,
+    "rule_recall": 0.0,
+    "combo_recall": 0.0,
+    "semantic_added": 0,
+    "semantic_added_correct": 0,
+    "semantic_precision": null,
+    "negative_false_positive": 0,
+    "threshold": 0.82,
+    "config": false
+  },
+  "cases": [
+    {
+      "id": "pos-01",
+      "expect": "付款与验收",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "口语化长账期，无「付款/发票/验收」关键词",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-02",
+      "expect": "付款与验收",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "用「结清款项」表达付款",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-03",
+      "expect": "责任限制",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "用「索赔」而非「赔偿」，用「数据丢失」而非「数据损失」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-04",
+      "expect": "责任限制",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "「间接损害 / 概不负责」替代「间接损失 / 责任」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-05",
+      "expect": "自动续期",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "用「延续」而非「续期/自动延长」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-06",
+      "expect": "自动续期",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "用「顺延」表达自动续期",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-07",
+      "expect": "独家合作",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "排他约定，但不含「独家」二字",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-08",
+      "expect": "数据使用",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "数据用于训练，动词与正则要求的距离较远",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-09",
+      "expect": "服务等级",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "「可用率」而非「可用性/SLA」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-10",
+      "expect": "保密义务",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "披露义务，但不含「保密/机密」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-11",
+      "expect": "知识产权",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "成果归属，但不含「知识产权/源代码/组件」",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "pos-12",
+      "expect": "付款与验收",
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "「货款 + 结清」表达付款",
+      "rule_hit": false,
+      "combo_hit": false
+    },
+    {
+      "id": "neg-01",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "法律适用，不应标注",
+      "false_positive": false
+    },
+    {
+      "id": "neg-02",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "形式条款，不应标注",
+      "false_positive": false
+    },
+    {
+      "id": "neg-03",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "原则性条款，不应标注",
+      "false_positive": false
+    },
+    {
+      "id": "neg-04",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "通知条款，不应标注",
+      "false_positive": false
+    },
+    {
+      "id": "neg-05",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "生效条款，不应标注",
+      "false_positive": false
+    },
+    {
+      "id": "neg-06",
+      "expect": null,
+      "rule_titles": [],
+      "semantic_titles": [],
+      "note": "含「责任」但属标准不可抗力条款，规则已排除，语义也不应补",
+      "false_positive": false
+    }
+  ],
+  "label": "纯规则基线",
+  "dataset": "semantic_cases.jsonl"
+}
