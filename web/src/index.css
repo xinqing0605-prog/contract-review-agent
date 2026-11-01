@@ -30,6 +30,13 @@ body {
   background: transparent;
 }
 
+/* 浏览器缩放或窄屏时，顶栏按钮优先整体换行，而不是把文字压成竖排 */
+header button,
+header [role="button"] {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* 原文高亮：底色区分风险，但颜色不单独承担信息（旁边永远有文字标签） */
 mark.clause-mark {
   @apply cursor-pointer rounded px-0.5 transition-colors;

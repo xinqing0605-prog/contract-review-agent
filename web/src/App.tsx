@@ -95,31 +95,31 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
   return (
     <div className="flex min-h-screen flex-col xl:h-screen xl:min-h-0 xl:overflow-hidden">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 px-4 py-2.5">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-[11px] font-bold text-white">
             CG
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold leading-tight text-slate-900">ClauseGuard</h1>
-            <p className="truncate text-[10px] text-slate-500">
+            <p className="hidden truncate text-[10px] text-slate-500 sm:block">
               合同审阅工作台 · 条款定位 / 风险分级 / 人工确认
             </p>
           </div>
 
-          <span className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500">
+          <span className="ml-2 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500">
             <i className={`h-1.5 w-1.5 rounded-full ${connection.tone}`} aria-hidden />
             {connection.label}
           </span>
 
           <span
             title="当前审阅使用的模型"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700"
           >
             <i className="h-1.5 w-1.5 rounded-full bg-slate-900" aria-hidden />
             {activeModel ?? '未配置模型'}
           </span>
 
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={() => void workspace.refresh()}
@@ -245,7 +245,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
           </div>
         ) : null}
 
-        <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[250px_minmax(0,1fr)_350px]">
+        <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_350px]">
           <Panel title="文档" subtitle={`${workspace.documents.length} 份`} className="min-h-0 xl:flex-1">
             <DocumentPanel
               documents={workspace.documents}
@@ -297,7 +297,7 @@ function WorkspaceShell({ user, onLogout }: { user: User; onLogout: () => void }
             </Panel>
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-col gap-3 [&>section]:min-h-0 [&>section]:flex-1">
+          <div className="flex min-h-0 min-w-0 flex-col gap-3 md:col-span-2 xl:col-span-1 [&>section]:min-h-0 [&>section]:flex-1">
             <Panel title="审阅链路" subtitle="后端真实执行记录">
               <WorkflowTimeline
                 steps={workspace.trace}
