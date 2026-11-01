@@ -46,6 +46,8 @@ jobs:
           docker run -d --name contract-agent --restart=always \
             -p 8081:8103 \
             -v /opt/cg-data:/data \
+            --log-opt max-size=10m \
+            --log-opt max-file=3 \
             -e CLAUSEGUARD_DATA=/data \
             -e CLAUSEGUARD_DB=/data/clauseguard.sqlite3 \
             -e CLAUSEGUARD_SECRET='${{ secrets.CLAUSEGUARD_SECRET }}' \

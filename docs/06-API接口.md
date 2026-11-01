@@ -1,4 +1,4 @@
-﻿# 06 · API 接口
+# 06 · API 接口
 
 Base URL：`http://127.0.0.1:8103`
 
@@ -16,11 +16,20 @@ Base URL：`http://127.0.0.1:8103`
 
 ### GET /api/health
 
-公开接口，用于存活探测。
+公开接口，用于存活探测；**会真实探测**，不是永远返回 ok。
 
 ```json
-{ "status": "ok", "service": "clauseguard", "version": "2.0.0" }
+{
+  "status": "ok",
+  "service": "clauseguard",
+  "version": "2.0.0",
+  "checks": { "db": "ok", "data_dir": "ok" }
+}
 ```
+
+- `checks.db`：执行一次轻量查询，失败记 `fail`
+- `checks.data_dir`：判断数据目录可写（上传与备份都依赖它），失败记 `fail`
+- 任一失败时 `status` 为 `degraded`，HTTP 仍返回 200（便于监控区分「活着但有问题」）
 
 ## 认证
 

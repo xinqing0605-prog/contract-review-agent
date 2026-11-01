@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Iterator
@@ -379,8 +380,25 @@ def _review_events(doc_id: str, user: dict[str, Any]) -> Iterator[dict[str, Any]
 
 # --------------------------------------------------------------------------- 路由
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "clauseguard", "version": "2.0.0"}
+def health() -> dict[str, Any]:
+    """真实探测，而不是永远返回 ok——部署脚本与监控都依赖它。"""
+    checks = {"db": "ok", "data_dir": "ok"}
+    status = "ok"
+    with db.tx() as conn:
+        try:
+            conn.execute("SELECT 1 FROM users LIMIT 1").fetchone()
+        except Exception:  # noqa: BLE001
+            checks["db"] = "fail"
+            status = "degraded"
+    if not os.access(db.DATA_DIR, os.W_OK):
+        checks["data_dir"] = "fail"
+        status = "degraded"
+    return {
+        "status": status,
+        "service": "clauseguard",
+        "version": "2.0.0",
+        "checks": checks,
+    }
 
 
 @app.get("/api/documents")

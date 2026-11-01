@@ -21,6 +21,8 @@ COPY backend/ backend/
 # eval/ 是评测数据集与脚本：tests/test_semantic_eval.py 依赖它，
 # 容器内跑 `python eval/run_semantic_eval.py --from-db` 也需要它
 COPY eval/ eval/
+# scripts/ 放运维脚本（目前是 SQLite 热备份），供 docker exec 调用
+COPY scripts/ scripts/
 COPY --from=web /app/web/dist web/dist
 
 RUN mkdir -p /data

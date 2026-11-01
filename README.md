@@ -193,7 +193,23 @@ python tests/smoke.py          # 需先启动服务
 cd web && npx tsc --noEmit && npm test
 ```
 
-当前：81 项后端测试（含 5 项用量统计、17 项语义召回、6 项历史案例、8 项评测自检）、9 项前端单测、14 项真实 HTTP 冒烟全部通过。
+当前：87 项后端测试（含 5 项用量统计、17 项语义召回、6 项历史案例、8 项评测自检、6 项运维）、9 项前端单测、14 项真实 HTTP 冒烟全部通过。
+
+## 运维
+
+| 事项 | 做法 | 位置 |
+|---|---|---|
+| 健康检查 | `GET /api/health` 真实探测数据库连通与数据目录可写，异常返回 `degraded` | `backend/app.py` |
+| 数据备份 | SQLite 热备份（`backup` API，不是 `cp`），保留 7 份，落在 `/data/backups` | `scripts/backup_db.py` |
+| 日志轮转 | 容器启动带 `--log-opt max-size=10m --log-opt max-file=3` | `.github/workflows/deploy.yml` |
+| 发布回滚 | 测试不通过不重启容器，旧版本继续服务 | 同上 |
+
+备份用 `sqlite3` 的 backup API 而不是直接复制文件：服务运行时直接 `cp` 可能拿到写了一半的页，
+属于常见的数据损坏来源。宿主机 crontab 每天执行一次：
+
+```bash
+docker exec contract-agent python scripts/backup_db.py
+```
 
 ## 安全
 
@@ -217,7 +233,8 @@ cd web && npx tsc --noEmit && npm test
 - SQLite 单实例，多副本部署需换 Postgres
 - 扫描版 PDF 无 OCR；PDF 表格的列结构会塌缩成一行
 - 条款检测以规则为主：未开启语义召回时，同义改写仍会漏检
-- 语义召回的样本库是人工维护的 8 类锚点，覆盖不到的表达仍会漏
+- 语义召回的样本库是人工维护的 8 类锚点，覆盖不到的表达仍会漏（评测集上 91.7%，非 100%）
+- 历史案例只检索「同类别」的历史条款，跨类别相似（如「赔偿上限」与「责任限制」）暂时搜不到
 - 长文档未做虚拟滚动
 - 无团队空间，数据严格按个人隔离
 
