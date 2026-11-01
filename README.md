@@ -4,9 +4,9 @@
 
 技术栈：FastAPI · SQLite · React 19 · TypeScript · Vite · Tailwind CSS
 
-**在线演示**　https://contract-review-agent-xi3i.onrender.com
+**在线演示**　http://49.232.39.123:8081 （备用：https://contract-review-agent-xi3i.onrender.com）
 
-> 免费实例，首次访问可能需要 30–60 秒唤醒。演示账号 `demo@clauseguard.local` / `demo1234`（未配置模型，以规则模式运行；配置自己的模型后可看到 AI 生成的风险解释）。
+> 演示账号 `demo@clauseguard.local` / `demo1234`（未配置模型时以规则模式运行；配置自己的模型后可看到 AI 生成的风险解释）。
 
 ## 界面预览
 
@@ -14,13 +14,17 @@
 
 ![主工作台](docs/images/workbench.png)
 
-**审批状态机**　待审批 → 已通过 / 已驳回 → 已执行，服务端强制门禁
+**规则 + 语义召回**　规则抓不到的「账期三个月结清」被向量召回补上，审阅链路里能看到补充条数与阈值
 
-![审批状态机](docs/images/approval.png)
+![语义召回](docs/images/semantic-recall.png)
 
-**模型配置**　服务商只是分组，每个模型独立保存接口地址与 Key
+**相似历史处置**　同一类别的历史条款按语义相似度召回，直接复用当时的采纳结论与批注
 
-![模型设置](docs/images/models.png)
+![历史案例](docs/images/similar-cases.png)
+
+**模型调用用量**　每次调用的 token、耗时与成败可查，按模型分组
+
+![调用用量](docs/images/usage.png)
 
 ## 功能
 
